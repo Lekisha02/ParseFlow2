@@ -31,9 +31,13 @@ def convert(path, include_furniture=False, save_images=False, out_dir=None):
 
 def _worker(path, opts, q):
     os.environ.setdefault("OMP_THREAD_LIMIT", "1")       # one Tesseract thread per worker process
+    try:
+        from . import markdown as md, pipeline  # noqa: F401  (imports are not part of the measured conversion time)
+    except BaseException as e:
+        q.put(dict(ok=False, seconds=0.0, error=f"import failed: {type(e).__name__}: {e}"))
+        return
     t0 = time.perf_counter()
     try:
-        from . import markdown as md
         doc = convert(path, include_furniture=opts.get("include_furniture", False))
         res = dict(ok=True, seconds=time.perf_counter() - t0, pages=len(doc["pages"]),
                    page_seconds=[p.get("seconds") for p in doc["pages"]], timings=doc.get("timings"),

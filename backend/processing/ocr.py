@@ -21,7 +21,7 @@ from collections import OrderedDict
 
 import numpy as np
 import pytesseract
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 from pytesseract import Output
 from scipy import ndimage as ndi
 
@@ -193,10 +193,10 @@ def preprocess(img, q=None, target_char_px=28, binarize=None):
         if hi - lo > 10:
             a = np.clip((a - lo) * 255.0 / (hi - lo), 0, 255)
             steps.append(f"contrast stretched ({q['contrast']:.0f} -> full range)")
-    if q["speckle"] > 0.45 and q["char_height_px"] >= 14:
-        a = ndi.median_filter(a, size=3)
-        steps.append("despeckled (median 3x3)")
     out = Image.fromarray(a.astype(np.uint8), "L")
+    if q["speckle"] > 0.45 and q["char_height_px"] >= 14:
+        out = out.filter(ImageFilter.MedianFilter(3))
+        steps.append("despeckled (median 3x3)")
     if abs(q["skew_deg"]) >= 0.4:
         out = out.rotate(q["skew_deg"], resample=Image.BICUBIC, expand=True, fillcolor=255)
         steps.append(f"deskewed {q['skew_deg']:+.1f} deg")
@@ -254,7 +254,8 @@ def ocr_image(img, psm=3, max_attempts=None, min_good=0.72):
 
     first_bin = q["bg_unevenness"] > 10 or q["contrast"] < 110
     best = attempt(first_bin, "binarised" if first_bin else "grey")
-    if best["score"] < min_good and max_attempts >= 2:
+    # a second representation helps moderately poor results; near-hopeless ones (handwriting, photos) only cost time
+    if min_good > best["score"] >= float(os.getenv("OCR_RETRY_FLOOR", "0.3")) and max_attempts >= 2:
         alt = attempt(not first_bin, "grey" if first_bin else "binarised")
         if alt["score"] > best["score"] + 0.02:
             best = alt

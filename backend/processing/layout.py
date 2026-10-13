@@ -75,7 +75,7 @@ def reading_order(items, body_size=10.0, _depth=0):
     x0 = min(i.bbox[0] for i in items); x1 = max(i.bbox[2] for i in items)
     W = max(1.0, x1 - x0)
     min_gutter = max(4.0, 0.55 * body_size)
-    narrow = [i for i in items if _w(i.bbox) < 0.55 * W]
+    narrow = [i for i in items if _w(i.bbox) < 0.8 * W]
     gutters = []
     if len(narrow) >= 2:
         for a, b in _gaps([(i.bbox[0], i.bbox[2]) for i in narrow], min_gutter):
@@ -92,6 +92,9 @@ def reading_order(items, body_size=10.0, _depth=0):
         cols = _split_columns(items, gutters)
         if len(cols) > 1:
             textlike = all(_column_is_text(c, body_size) for c in cols)
+            if not textlike and any(_column_is_text(c, body_size) for c in cols) and all(len(c) >= 2 for c in cols):
+                # sidebar beside a text column (not a label/value list: labels would sit on the text's baselines)
+                textlike = _row_alignment(cols, body_size) < 0.6
             ygaps = _gaps([(i.bbox[1], i.bbox[3]) for i in items], 0.15 * body_size)
             if textlike or not ygaps:
                 out, multi = [], textlike
@@ -175,6 +178,17 @@ def _split_columns(items, gutters):
     return [c for c in cols if c]
 
 
+def _row_alignment(cols, body_size):
+    """Fraction of items in the non-text columns whose baseline coincides with an item in a text column."""
+    text_cols = [c for c in cols if _column_is_text(c, body_size)]
+    other = [i for c in cols if c not in text_cols for i in c]
+    if not other:
+        return 0.0
+    bases = [getattr(i, "baseline", i.bbox[3]) for c in text_cols for i in c]
+    hit = sum(1 for i in other if any(abs(getattr(i, "baseline", i.bbox[3]) - b) < 0.3 * body_size for b in bases))
+    return hit / len(other)
+
+
 def _column_is_text(col, body_size):
     if any(not _is_text(i) for i in col):
         return True
@@ -250,6 +264,8 @@ def _continues(para, last, seg, body):
         return False                                   # bold heading line followed by body text
     if last.mono != seg.mono:
         return False
+    if _caps_title(last.text) and not _caps_title(seg.text):
+        return False                                   # ALL-CAPS section title above body text
     gap = seg.bbox[1] - last.bbox[3]
     lead = 0.9 * max(sz, lsz)
     if gap > lead or gap < -0.6 * max(sz, lsz):
@@ -267,6 +283,12 @@ def _continues(para, last, seg, body):
 # ---------------------------------------------------------------------------------------------
 # Text joining with evidence-based dehyphenation
 # ---------------------------------------------------------------------------------------------
+def normalize_quotes(t):
+    """TeX-style double quotes typeset as two single quotes -> proper double quotes."""
+    t = t.replace("\u2018\u2018", "\u201c").replace("\u2019\u2019", "\u201d").replace("``", "\u201c")
+    return t
+
+
 def join_lines(lines, vocab=None):
     """Join line texts into a paragraph. A trailing hyphen is removed only when the evidence supports it:
     both fragments are lowercase letters, and either the joined word occurs elsewhere in the document
@@ -292,7 +314,7 @@ def join_lines(lines, vocab=None):
                 parts[-1] = prev + t; transforms.append(f"kept hyphen '{a}-{b}' (compound prefix)")
         else:
             parts[-1] = prev + " " + t
-    return re.sub(r"[ \t]+", " ", parts[0] if parts else "").strip(), transforms
+    return normalize_quotes(re.sub(r"[ \t]+", " ", parts[0] if parts else "").strip()), transforms
 
 
 def doc_vocab(texts):
@@ -314,6 +336,12 @@ def body_like_sizes(paras):
     return {k for k, v in tot.items() if v >= 0.15 * allc}
 
 
+def _caps_title(t):
+    t = t.strip()
+    letters = [c for c in t if c.isalpha()]
+    return 4 <= len(letters) and len(t.split()) <= 10 and all(not c.islower() for c in letters) and not re.search(r"[.,;]$", t)
+
+
 def classify(para, body_size, heading_sizes, body_sizes=()):
     """Return (type, level) for an assembled paragraph."""
     text = " ".join(l.text for l in para.lines).strip()
@@ -331,6 +359,8 @@ def classify(para, body_size, heading_sizes, body_sizes=()):
             return "heading", min(lvl, 4)
         if para.bold and n <= 2 and len(text) < 120 and not text.endswith(".") and re.search(r"[^\W\d_]{2}", text):
             return "heading", min(len(heading_sizes) + 1, 4)
+        if n <= 2 and _caps_title(text) and sz >= 0.95 * body_size and re.search(r"[^\W\d_]{3}", text):
+            return "heading", min(len(heading_sizes) + 2, 4)
     return "paragraph", 0
 
 

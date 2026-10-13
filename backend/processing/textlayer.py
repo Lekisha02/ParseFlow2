@@ -91,12 +91,24 @@ class Segment:
         return self.bbox[3] - self.bbox[1]
 
 
+def _space_threshold(chars):
+    """Gap (in em) above which a missing space is synthesised. Lines that already carry space glyphs use a
+    conservative threshold; lines without any (some producers position every word) use the line's own gap
+    distribution: letter gaps cluster near zero, word gaps sit well above them."""
+    gaps = sorted((b.x0 - a.x1) / max(a.size, b.size, 1) for a, b in zip(chars, chars[1:]) if not a.c.isspace() and not b.c.isspace())
+    if len(gaps) < 4:
+        return 0.2
+    med = gaps[len(gaps) // 2]
+    return max(0.1, min(0.25, med + 0.1))
+
+
 def _chars_to_text(chars):
     out, prev = [], None
+    thr = _space_threshold(chars) if chars else 0.25
     for ch in chars:
         if prev is not None and not ch.c.isspace() and not prev.c.isspace():
             gap = ch.x0 - prev.x1
-            if gap > 0.25 * max(ch.size, prev.size, 1):
+            if gap > thr * max(ch.size, prev.size, 1):
                 out.append(" ")
         out.append(ch.c)
         prev = ch

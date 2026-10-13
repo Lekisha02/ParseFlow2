@@ -145,8 +145,14 @@ def route_page(a, ocr_ok):
     return ("ocr" if ocr_ok else "unreadable"), "no usable text layer"
 
 
-def detect_ink_regions(img, ocr_boxes):
-    """Regions with ink that OCR could not explain (handwriting, diagrams, charts). Ruled lines are removed first."""
+def detect_ink_regions(img, ocr_boxes, max_side=1800):
+    """Regions with ink that OCR could not explain (handwriting, diagrams, charts). Ruled lines are removed first.
+    Large images are analysed on a downsampled copy (morphology cost grows with pixel count)."""
+    k = min(1.0, max_side / max(img.size))
+    if k < 1.0:
+        small = img.convert("L").resize((max(1, int(img.width * k)), max(1, int(img.height * k))), Image.BILINEAR)
+        res = detect_ink_regions(small, [tuple(v * k for v in b) for b in ocr_boxes], max_side)
+        return [tuple(min(lim, v / k) for v, lim in zip(r, (img.width, img.height, img.width, img.height))) for r in res]
     g = np.array(img.convert("L")); thr = min(170, np.median(g) * 0.65)
     mask = g < thr
     mask &= ~ndi.binary_dilation(ndi.binary_opening(mask, structure=np.ones((1, 90))) | ndi.binary_opening(mask, structure=np.ones((90, 1))), iterations=2)
@@ -467,7 +473,7 @@ def vision_blocks(crop_img, bbox, hint, state, tag):
         err = err or "vision model returned no regions"
     why = f"Vision extraction failed ({err}) — region preserved, flagged." if err else "Visual analysis unavailable: no VISION_API_KEY configured — region preserved, flagged."
     oc, ot = (0, "")
-    if state.get("ocr_ok") and state["region_ocr_left"] > 0:
+    if state.get("ocr_ok") and state["region_ocr_left"] > 0 and tag != "ink":   # ink regions: page already OCR'd
         state["region_ocr_left"] -= 1
         try:
             oc, ot = ocr.quick_conf(crop_img)
@@ -722,7 +728,7 @@ def _analyze_digital(ctx, segs, warnings):
     eq_ids = {id(s) for e in eqs for s in e["segs"]}
     noneq = [s for s in segs if id(s) not in eq_ids]
     # tables
-    ruled = tables.detect_ruled(p, noneq, len(vr) >= 2) if ctx["route"] == "digital" else []
+    ruled = tables.detect_ruled(p, noneq, len(vr) >= 2, hr, vr) if ctx["route"] == "digital" else []
     aligned, used = tables.detect_aligned(noneq, hr, body, W, exclude=[t.bbox for t in ruled] + [e["bbox"] for e in eqs])
     tbs = ruled + aligned
     hdr_used = set()
@@ -761,10 +767,18 @@ def _extract_ocr(ctx, warnings, state):
     a = ctx.get("a", {})
     # re-render at the scan's native resolution (bounded) for small print
     zoom = Z
-    if ctx.get("pdf_page") is not None and a.get("img_zoom", 0) > Z * 1.15:
-        zoom = min(a["img_zoom"], float(os.getenv("OCR_MAX_ZOOM", "4.17")))
-        pix = ctx["pdf_page"].get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False, colorspace=pymupdf.csGRAY)
-        oimg = Image.frombytes("L", (pix.width, pix.height), pix.samples)
+    if ctx.get("pdf_page") is not None:
+        native = a.get("img_zoom", 0) or Z
+        # render at the scan's own resolution: never upsample a low-resolution scan (wasted OCR time), and cap
+        # very high resolutions / very large pages to a bounded pixel budget
+        zoom = min(max(native, 1.0), float(os.getenv("OCR_MAX_ZOOM", "4.17")))
+        max_side = float(os.getenv("OCR_MAX_SIDE_PX", "4200"))
+        zoom = min(zoom, max_side / max(ctx["W"], ctx["H"]))
+        if abs(zoom - Z) < 0.05:
+            oimg, zoom = img.convert("L"), Z
+        else:
+            pix = ctx["pdf_page"].get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False, colorspace=pymupdf.csGRAY)
+            oimg = Image.frombytes("L", (pix.width, pix.height), pix.samples)
     else:
         oimg = img
     res = ocr.ocr_image(oimg)
@@ -872,7 +886,7 @@ def _blocks_for_page(ctx, state):
                 blocks.append(b)
             elif img is not None:
                 crop = img.crop(tuple(int(v * Z) for v in bb))
-                vb = vision_blocks(crop, scale(bb), reg.get("hint", "figure"), state, "figure")
+                vb = vision_blocks(crop, scale(bb), reg.get("hint", "figure"), state, "ink" if reg.get("ink") else "figure")
                 for b in vb:
                     b["reading_order"] = ro
                 blocks += vb

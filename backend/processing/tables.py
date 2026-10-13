@@ -220,13 +220,22 @@ def detect_aligned(segs, hrules, body_size, page_w, exclude=()):
             i += 1; continue
         j = i
         multi = 1
+        sizes0 = [statistics.median([s.size for s in rows[i].segs])]
         while j + 1 < len(rows):
             nxt, cur = rows[j + 1], rows[j]
             lh = max(1.0, cur.y1 - cur.y0)
-            if nxt.y0 - cur.y1 > max(2.2 * lh, 2.0 * body_size) and not _rule_between(hrules, cur.y1, nxt.y0):
+            gap = nxt.y0 - cur.y1
+            if gap > max(2.2 * lh, 2.0 * body_size) and not (_rule_between(hrules, cur.y1, nxt.y0) and gap < 4.5 * lh):
                 break
+            nsz = statistics.median([s.size for s in nxt.segs])
+            if nsz > 1.2 * statistics.median(sizes0) or nsz < 0.7 * statistics.median(sizes0):
+                break           # a heading or footnote in another font size ends the table
             if _proselike(nxt, body_size):
-                break
+                # a category row ('Translation  Rosetta-stone style ...') is allowed when the table continues after it
+                after = rows[j + 2] if j + 2 < len(rows) else None
+                if not (after and len(after.frags) >= 3 and not _proselike(after, body_size) and after.y0 - nxt.y1 < 2.2 * lh and multi >= 2):
+                    break
+            sizes0.append(nsz)
             if len(nxt.frags) >= 2:
                 multi += 1
             elif not _short(nxt, body_size):
@@ -285,13 +294,98 @@ def _column_edges(block, body):
         else:
             cols.append(tuple(cur)); cur = [a, b]
     cols.append(tuple(cur))
+    # wide fragments that overlap no column are a real (text) column, not a spanning header
+    extra = [(f[0], f[1]) for f in frs if f not in narrow and not any(min(f[1], c[1]) - max(f[0], c[0]) > 0 for c in cols)]
+    if extra:
+        allc = sorted(cols + extra)
+        cols, cur = [], list(allc[0])
+        for a, b in allc[1:]:
+            if a <= cur[1] + 0.3 * body:
+                cur[1] = max(cur[1], b)
+            else:
+                cols.append(tuple(cur)); cur = [a, b]
+        cols.append(tuple(cur))
     return cols
+
+
+def _split_rivers(block, cols, body):
+    """Split a column at a vertical whitespace channel that runs through (nearly) every row of the column -
+    e.g. a narrow '#' column whose numbers sit one word-space left of the next column ('1 Easy')."""
+    out = []
+    for c0, c1 in cols:
+        glyphs, rows_in = [], 0
+        for r in block:
+            cs = [ch for f in r.frags for ch in f[3] if c0 - 0.5 <= (ch.x0 + ch.x1) / 2 <= c1 + 0.5]
+            if cs:
+                rows_in += 1
+                glyphs.append([(ch.x0, ch.x1) for ch in cs])
+        if rows_in < 3 or c1 - c0 < 3 * body:
+            out.append((c0, c1)); continue
+        step = 0.5
+        n = int((c1 - c0) / step) + 1
+        occ = [0] * n
+        for gl in glyphs:
+            mark = [False] * n
+            for a, b in gl:
+                for k in range(max(0, int((a - c0) / step)), min(n, int((b - c0) / step) + 1)):
+                    mark[k] = True
+            for k in range(n):
+                occ[k] += mark[k]
+        best, run = None, []
+        for k in range(n + 1):
+            if k < n and occ[k] <= 0.3 * rows_in:
+                run.append(k); continue
+            if run and len(run) * step >= 0.25 * body and run[0] > 0 and k < n:
+                x = c0 + (run[0] + run[-1]) / 2 * step
+                lft = sum(1 for gl in glyphs if any(b <= x for a, b in gl))
+                rgt = sum(1 for gl in glyphs if any(a >= x for a, b in gl))
+                if lft >= 0.6 * rows_in and rgt >= 0.6 * rows_in and (best is None or len(run) > best[1]):
+                    best = (x, len(run))
+            run = []
+        if best:
+            out += [(c0, best[0] - 0.01), (best[0] + 0.01, c1)]
+        else:
+            out.append((c0, c1))
+    return out
+
+
+def _resplit_frags(block, cols):
+    """Cut fragments that straddle a column boundary created by river splitting."""
+    from .textlayer import _chars_to_text
+    bounds_all = sorted(b[1] for b in cols[:-1])
+    for r in block:
+        nf = []
+        for f in r.frags:
+            cut = [b for b in bounds_all if f[0] < b < f[1]]
+            # only cut where the fragment really has whitespace at the boundary (a category label that runs
+            # across both columns stays whole and becomes a spanning cell)
+            vis0 = [c for c in f[3] if c.c.strip()]
+            cut = [b for b in cut if any(a.x1 <= b <= c.x0 and c.x0 - a.x1 > 0.15 * max(a.size, 1) for a, c in zip(vis0, vis0[1:]))]
+            if not cut:
+                nf.append(f); continue
+            pieces, cur = [], []
+            for ch in f[3]:
+                if cur and cut and (ch.x0 + ch.x1) / 2 > cut[0]:
+                    pieces.append(cur); cur = []
+                    cut.pop(0)
+                cur.append(ch)
+            if cur:
+                pieces.append(cur)
+            for pc in pieces:
+                vis = [c for c in pc if c.c.strip()]
+                if vis:
+                    nf.append((min(c.x0 for c in vis), max(c.x1 for c in vis), _chars_to_text(pc), vis))
+        r.frags = nf
 
 
 def _build_aligned(block, hrules, body):
     cols = _column_edges(block, body)
     if len(cols) < 2:
         return None
+    rc = _split_rivers(block, cols, body)
+    if len(rc) > len(cols):
+        cols = rc
+        _resplit_frags(block, cols)
     nrows, ncols = len(block), len(cols)
     # reject multi-column prose: few columns, long fragments
     lens = [len(f[2]) for r in block for f in r.frags]
@@ -371,14 +465,40 @@ def _build_aligned(block, hrules, body):
 # ---------------------------------------------------------------------------------------------
 # Ruled tables (PyMuPDF find_tables) -> structured model with spans
 # ---------------------------------------------------------------------------------------------
-def detect_ruled(page, segs, has_vrules):
+def grid_regions(hrules, vrules, pad=4.0):
+    """Regions where vector rules actually form a grid: >= 2 vertical rules overlapping in y, crossed by
+    >= 2 horizontal rules. find_tables() is expensive, so it only runs inside these regions."""
+    vs = sorted(vrules, key=lambda v: v[1])
+    clusters = []
+    for v in vs:
+        for c in clusters:
+            if v[1] <= c["y1"] + pad and v[3] >= c["y0"] - pad:
+                c["v"].append(v); c["y0"] = min(c["y0"], v[1]); c["y1"] = max(c["y1"], v[3]); break
+        else:
+            clusters.append(dict(v=[v], y0=v[1], y1=v[3]))
+    out = []
+    for c in clusters:
+        xs = sorted({round(v[0]) for v in c["v"]})
+        if len(xs) < 2:
+            continue
+        x0, x1 = xs[0], xs[-1]
+        cross = [h for h in hrules if c["y0"] - pad <= h[1] <= c["y1"] + pad and h[0] <= x0 + pad and h[2] >= x1 - pad]
+        if len(cross) >= 2:
+            out.append((x0 - pad, c["y0"] - pad, x1 + pad, c["y1"] + pad))
+    return out
+
+
+def detect_ruled(page, segs, has_vrules, hrules=None, vrules=None):
     if not has_vrules:
         return []
     out = []
-    try:
-        found = page.find_tables(strategy="lines").tables
-    except Exception:
-        return []
+    regions = grid_regions(hrules or [], vrules or []) if vrules is not None else [None]
+    found = []
+    for clip in regions:
+        try:
+            found += page.find_tables(strategy="lines", clip=clip).tables if clip else page.find_tables(strategy="lines").tables
+        except Exception:
+            continue
     for t in found:
         cb = [tuple(c) for c in (t.cells or []) if c]
         if len(cb) < 4:
@@ -536,8 +656,34 @@ def extend_header(tb, segs, hrules, body):
             used.add(id(s))
         if len(added) >= 4:
             break
+    # rotated column labels (e.g. 45-degree headers) directly above the table: one header row, each label
+    # assigned to the column under its starting point
+    rot = [s for s in segs if not s.horizontal and s.bbox[3] <= tb.bbox[1] + 0.8 * body and tb.bbox[1] - s.bbox[3] < 3 * body
+           and x0 - 2 * body <= s.chars[0].ox <= x1 + 2 * body]
+    if rot:
+        ry0, ry1 = min(s.bbox[1] for s in rot), max(s.bbox[3] for s in rot)
+        frs = [(s.chars[0].ox, s.chars[0].ox + 0.1, s.text, s.chars) for s in rot]
+        r = _Row(ry0, ry1, ry1, sorted(frs, key=lambda f: f[0]), rot)
+        added = [a for a in added if a.y1 <= ry0 + 1] + [r] + [a for a in added if a.y1 > ry0 + 1]
+        for sg in rot:
+            used.add(id(sg))
+        # horizontal rows further up (group labels like 'ReACT') become reachable once the rotated band is in
+        more = sorted(_rows([sg for sg in cand if sg.bbox[3] <= ry0 + 1 and id(sg) not in used]), key=lambda x: -x.y1)
+        top2 = ry0
+        for x in more:
+            lh = max(1.0, x.y1 - x.y0)
+            if top2 - x.y1 > max(2.2 * lh, 1.8 * body) or _proselike(x, body) or any(len(f[2]) > 45 for f in x.frags):
+                break
+            if any(id(sg) in used for sg in x.segs):
+                continue
+            added.append(x); top2 = x.y0
+            for sg in x.segs:
+                used.add(id(sg))
+            if len(added) >= 5:
+                break
     if not added:
         return tb, set()
+    added = sorted(added, key=lambda a: a.y0)
     k = len(added)
     for c in tb.cells:
         c.row += k
@@ -548,7 +694,9 @@ def extend_header(tb, segs, hrules, body):
         for f in r.frags:
             fc = (f[0] + f[1]) / 2
             near = lambda h: r.y1 - 1 <= h[1] <= r.y1 + 0.9 * (r.y1 - r.y0) + 2 and h[0] - 1 <= fc <= h[2] + 1
-            rule = next((h for h in hrules if near(h) and h[2] - h[0] > (f[1] - f[0]) * 1.2), None)
+            rotated_row = all(not sg.horizontal for sg in r.segs)
+            tw = max(1.0, x1 - x0)
+            rule = None if rotated_row else next((h for h in hrules if near(h) and h[2] - h[0] > (f[1] - f[0]) * 1.2 and (h[2] - h[0]) < 0.9 * tw), None)
             if rule and sum(1 for g in r.frags if rule[0] - 1 <= (g[0] + g[1]) / 2 <= rule[2] + 1) > 1:
                 # several labels under one long underline: each label owns only its own piece
                 rule = next((h for h in pieces if near(h) and h[2] - h[0] > (f[1] - f[0]) * 1.2), None)

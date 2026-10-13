@@ -449,6 +449,8 @@ def token_class(tok, main):
         return "weak"
     if small and big_letters and len(big_letters) <= 2 and any(c.size < 0.85 * main for c in letters):
         return "weak"      # e.g. 'Rs' with a subscript
+    if small and any(c.c in "()[]/=^_" for c in vis) and len(big_letters) <= 6:
+        return "weak"      # e.g. 'R/Ann_R(x_i)': scripts plus brackets/slash only occur in formulas
     return "text"
 
 
