@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 
 import pymupdf
 
+getattr(pymupdf, "no_recommend_layout", lambda: None)()   # keep stdout clean (CLI --log-json emits JSON lines)
+
 SUPERSCRIPT, ITALIC, SERIFED, MONO, BOLD = 1, 2, 4, 8, 16
 
 # rawdict flags: expand ligatures (no PRESERVE_LIGATURES), keep whitespace, clip to the visible page,
@@ -179,7 +181,26 @@ def read_segments(page, split_gap_em=1.6, cell_gap_em=0.9, ocr_layer=False):
                         segs.append(Segment(part, _line_box(part), dr, gaps))
             else:
                 segs.append(Segment(chars, _line_box(chars), dr))
-    return segs, invisible
+    return _attach_stray_accents(segs), invisible
+
+
+def _attach_stray_accents(segs):
+    """An accent emitted as its own text object becomes a one-glyph segment: put it back on its letter."""
+    out = list(segs)
+    for a in [s for s in segs if s.horizontal and len(s.chars) == 1 and s.chars[0].c in _SPACING_ACCENT]:
+        ac = a.chars[0]
+        cx = (ac.x0 + ac.x1) / 2
+        for t in out:
+            if t is a or not t.horizontal:
+                continue
+            if any(ch.c.isalpha() and ch.x0 - 0.15 * ch.size <= cx <= ch.x1 + 0.15 * ch.size and abs(ch.oy - ac.oy) < 0.8 * max(ch.size, 1) for ch in t.chars):
+                merged = compose_accents(sorted(t.chars + [ac], key=lambda c: c.x0))
+                if len(merged) == len(t.chars):          # the accent was absorbed
+                    t.chars[:] = merged
+                    t._text = None
+                    out.remove(a)
+                break
+    return out
 
 
 def _monotonic_runs(chars):

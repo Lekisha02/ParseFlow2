@@ -124,5 +124,6 @@ def render(doc, include_furniture=False, annotate=True):
         out.append(md)
     if annotate and doc.get("warnings"):
         out.append("\n".join(f"<!-- warning: {w} -->" for w in doc["warnings"]))
-    text = "\n\n".join(out).strip() + "\n"
-    return _nfc(text)
+    text = "\n\n".join(out).strip()
+    # an empty document yields an empty string (not a lone newline): nothing should look like content
+    return _nfc(text + "\n") if text else ""

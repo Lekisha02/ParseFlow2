@@ -437,6 +437,10 @@ def token_class(tok, main):
     vis = [c for c in tok if c.c.strip()]
     if not vis:
         return "space"
+    letters0 = [c for c in vis if c.c.isalpha()]
+    if len(letters0) >= 3 and all(c.c in GREEK or "\u0370" <= c.c <= "\u03ff" or "\u1f00" <= c.c <= "\u1fff" for c in letters0) \
+            and not any(c.c in SYMBOLS or c.c in "=<>+" for c in vis) and not MATH_FONT.search(vis[0].font):
+        return "text"      # a Greek-language word, not a formula
     if any(_is_strong(c, main) for c in vis):
         return "strong"
     letters = [c for c in vis if c.c.isalpha()]

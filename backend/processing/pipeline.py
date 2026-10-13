@@ -135,6 +135,8 @@ def route_page(a, ocr_ok):
     """Decide how to read a page. Returns (route, reason)."""
     if a["chars"] >= 30 and a["text_quality"] >= 0.6 and not (a["image_coverage"] > 0.85 and a["chars"] < 80):
         return "digital", "visible text layer passes quality checks"
+    if 0 < a["chars"] < 30 and a["text_quality"] >= 0.6 and a["image_coverage"] < 0.3 and a["invisible"] <= 20:
+        return "digital", "sparse page: short but trustworthy text layer and no large images"
     if a["chars"] >= 30 and a["text_quality"] < 0.6:
         return ("ocr" if ocr_ok else "digital"), f"visible text layer looks broken (quality {a['text_quality']:.2f})"
     if a["invisible"] > 20:
@@ -784,6 +786,15 @@ def _extract_ocr(ctx, warnings, state):
     res = ocr.ocr_image(oimg)
     k = zoom   # px per PDF point
     lines = ocr_lines(res["words"], k)
+    lenient = False
+    if not lines and res["metrics"].get("contrast", 0) >= 60 and res["metrics"].get("dark_ratio", 0) >= 0.005:
+        # real ink but nothing passed the noise filter (typically handwriting): keep the plausible words, flagged
+        good = [w for w in res["words"] if w["conf"] >= 0.45 and re.fullmatch(r"[^\W\d_]{3,}[.,;:]?|\d[\d.,/:-]*", w["text"])]
+        groups = {}
+        for w in good:
+            groups.setdefault((w["block"], w["par"], w["line"]), []).append(w)
+        lines = [OcrLine(ws, k) for ws in groups.values()]
+        lenient = bool(lines)
     # hybrid page: visible native text (titles over a photo, stamps on a scan) is exact - keep it and drop
     # OCR lines that duplicate it
     native = [sg for sg in a.get("segs", []) if sg.text.strip()] if a.get("text_quality", 0) >= 0.6 else []
@@ -807,6 +818,10 @@ def _extract_ocr(ctx, warnings, state):
     ctx["items"] = items
     ctx["flags"] = dict(text_layer=bool(a.get("chars")), scanned=True, tables=len(aligned), figures=0,
                         visual_regions=sum(1 for i in items if i.get("ink")))
+    if lenient:
+        ctx["lenient_ocr"] = True
+        warnings.append(f"Page {n}: only isolated low-confidence OCR words were found (likely handwriting); they are kept, "
+                        "flagged, and need review — a vision model is required to transcribe handwriting.")
     if res["conf"] < 0.6:
         warnings.append(f"Page {n}: low OCR confidence ({res['conf']:.2f}) after preprocessing ({', '.join(res['steps']) or 'none needed'}).")
 

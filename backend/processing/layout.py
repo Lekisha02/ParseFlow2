@@ -260,8 +260,10 @@ def _continues(para, last, seg, body):
         return False
     if BULLET.match(seg.text) and len(seg.text) > 2:
         return False
-    if last.bold != seg.bold and (len(para.lines) == 1 and last.bold):
-        return False                                   # bold heading line followed by body text
+    if last.bold and not seg.bold and all(l.bold for l in para.lines):
+        return False                                   # bold heading line(s) followed by body text
+    if seg.bold and not last.bold and len(seg.text) < 120:
+        return False                                   # body text followed by a bold heading
     if last.mono != seg.mono:
         return False
     if _caps_title(last.text) and not _caps_title(seg.text):

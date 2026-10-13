@@ -122,27 +122,45 @@ def assess(img):
     """Measure scan characteristics on a downsampled copy. Returns a dict of metrics."""
     g = img.convert("L")
     a, k = _small(g)
-    p2, p50, p98 = np.percentile(a, [2, 50, 98])
-    contrast = float(p98 - p2)
+    p50 = float(np.percentile(a, 50))
+    # contrast = background level minus ink level; percentiles of the whole page fail when text is sparse
+    ink_level, bg_level = np.percentile(a, [0.3, 60])
+    contrast = float(bg_level - ink_level)
     win = max(15, int(min(a.shape) / 12) | 1)
     bg = ndi.grey_closing(a, size=(7, 7))
     bg = ndi.uniform_filter(bg, size=win)
     light = a > p50
     bg_var = float(np.std(bg[light])) if light.any() else 0.0
-    thr = _otsu(a)
-    ink = a < thr
+    # normalise illumination before binarising so gradients do not masquerade as ink
+    norm = a / np.maximum(bg, 1) * 255.0 if bg_var > 10 else a
+    thr = min(_otsu(norm), float(np.percentile(norm, 60)) - 0.35 * max(contrast, 1))
+    ink = norm < thr
     dark_ratio = float(ink.mean())
     lab, n = ndi.label(ink)
     if n:
         sizes = np.bincount(lab.ravel())[1:]
         speckle = float((sizes <= 2).sum() / max(1, n))
-        objs = ndi.find_objects(lab)
-        hs = np.array([sl[0].stop - sl[0].start for sl, sz in zip(objs, sizes) if sz > 4])
+        clean = ndi.binary_opening(ink, structure=np.ones((2, 2))) if speckle > 0.3 else ink
+        lab2, n2 = ndi.label(clean)
+        objs = ndi.find_objects(lab2)
+        sizes2 = np.bincount(lab2.ravel())[1:] if n2 else np.array([])
+        hs = np.array([sl[0].stop - sl[0].start for sl, sz in zip(objs, sizes2) if sz > 6])
         hs = hs[(hs >= 3) & (hs < a.shape[0] / 8)] if hs.size else hs
-        char_h = float(np.median(hs) / k) if hs.size else 0.0
+        char_h = float(np.percentile(hs, 70) / k) if hs.size >= 5 else 0.0
     else:
         speckle, char_h = 0.0, 0.0
-    skew = _skew(ink) if dark_ratio > 0.002 else 0.0
+    skew = _skew(ink) if 0.002 < dark_ratio < 0.35 else 0.0
+    # speckle must be measured at full resolution (downsampling averages isolated noise pixels away)
+    full = np.asarray(g, dtype=np.float32)
+    h0, w0 = full.shape
+    cy, cx = h0 // 2, w0 // 2
+    crop = full[max(0, cy - 300):cy + 300, max(0, cx - 300):cx + 300]
+    if crop.size:
+        cink = crop < min(_otsu(crop), float(np.percentile(crop, 60)) - 0.35 * max(contrast, 1))
+        lab3, n3 = ndi.label(cink)
+        if n3:
+            sz3 = np.bincount(lab3.ravel())[1:]
+            speckle = max(speckle, float((sz3 <= 2).sum() / n3))
     return dict(contrast=round(contrast, 1), bg_unevenness=round(bg_var, 1), dark_ratio=round(dark_ratio, 4),
                 speckle=round(speckle, 3), char_height_px=round(char_h, 1), skew_deg=round(skew, 2), size=img.size)
 
@@ -168,19 +186,29 @@ def _skew(ink, max_deg=6.0):
         r = ndi.rotate(sm, deg, reshape=False, order=0, mode="constant")
         prof = r.sum(axis=1)
         return float(np.var(prof))
+    s0 = score(0.0)
     best = max(np.arange(-max_deg, max_deg + 0.01, 1.0), key=score)
     fine = max(np.arange(best - 1.0, best + 1.01, 0.2), key=score)
+    if score(fine) < 1.05 * s0:          # no clear improvement: do not rotate on a weak estimate
+        return 0.0
     return -float(fine) if abs(fine) > 0.05 else 0.0
 
 
 # ---------------------------------------------------------------------------------------------
 # Preprocessing
 # ---------------------------------------------------------------------------------------------
-def preprocess(img, q=None, target_char_px=28, binarize=None):
+def preprocess(img, q=None, target_char_px=16, binarize=None, minimal=False):
     """Return (image_L, steps). Steps are chosen from measured metrics, never applied blindly."""
     q = q or assess(img)
     g = img.convert("L")
     steps = []
+    if minimal:      # the conservative fallback: only a contrast stretch (and deskew), nothing that can destroy strokes
+        out = ImageOps.autocontrast(g, cutoff=1)
+        steps.append("minimal: autocontrast only")
+        if abs(q["skew_deg"]) >= 0.4:
+            out = out.rotate(-q["skew_deg"], resample=Image.BICUBIC, expand=True, fillcolor=255)
+            steps.append(f"deskewed {-q['skew_deg']:+.1f} deg")
+        return out, steps
     a = np.asarray(g, dtype=np.float32)
     if q["bg_unevenness"] > 10:
         size = int(max(15, 3 * max(q["char_height_px"], 8)))
@@ -194,14 +222,14 @@ def preprocess(img, q=None, target_char_px=28, binarize=None):
             a = np.clip((a - lo) * 255.0 / (hi - lo), 0, 255)
             steps.append(f"contrast stretched ({q['contrast']:.0f} -> full range)")
     out = Image.fromarray(a.astype(np.uint8), "L")
-    if q["speckle"] > 0.45 and q["char_height_px"] >= 14:
+    if q["speckle"] > 0.45 and q["char_height_px"] >= 8:
         out = out.filter(ImageFilter.MedianFilter(3))
         steps.append("despeckled (median 3x3)")
-    if abs(q["skew_deg"]) >= 0.4:
-        out = out.rotate(q["skew_deg"], resample=Image.BICUBIC, expand=True, fillcolor=255)
-        steps.append(f"deskewed {q['skew_deg']:+.1f} deg")
+    if abs(q["skew_deg"]) >= 0.4:      # skew_deg = page rotation (counter-clockwise); undo it
+        out = out.rotate(-q["skew_deg"], resample=Image.BICUBIC, expand=True, fillcolor=255)
+        steps.append(f"deskewed {-q['skew_deg']:+.1f} deg")
     ch = q["char_height_px"]
-    if 0 < ch < 0.7 * target_char_px:
+    if 0 < ch < 0.62 * target_char_px and q["contrast"] >= 25:   # near-blank paper: 'characters' are texture
         f = min(3.0, target_char_px / ch)
         out = out.resize((int(out.width * f), int(out.height * f)), Image.LANCZOS)
         steps.append(f"upscaled x{f:.2f} (small text, ~{ch:.0f}px)")
@@ -245,8 +273,8 @@ def ocr_image(img, psm=3, max_attempts=None, min_good=0.72):
     q = assess(img)
     tries = []
 
-    def attempt(binarize, label):
-        pim, steps = preprocess(img, q, binarize=binarize)
+    def attempt(binarize, label, minimal=False):
+        pim, steps = preprocess(img, q, binarize=binarize, minimal=minimal)
         ws = _run(pim, psm)
         score, conf, plaus = _quality(ws)
         tries.append(dict(label=label, steps=steps, n=len(ws), conf=round(conf, 3), plausibility=round(plaus, 3), score=round(score, 3)))
@@ -254,10 +282,16 @@ def ocr_image(img, psm=3, max_attempts=None, min_good=0.72):
 
     first_bin = q["bg_unevenness"] > 10 or q["contrast"] < 110
     best = attempt(first_bin, "binarised" if first_bin else "grey")
-    # a second representation helps moderately poor results; near-hopeless ones (handwriting, photos) only cost time
-    if min_good > best["score"] >= float(os.getenv("OCR_RETRY_FLOOR", "0.3")) and max_attempts >= 2:
-        alt = attempt(not first_bin, "grey" if first_bin else "binarised")
-        if alt["score"] > best["score"] + 0.02:
+    if best["score"] < min_good and max_attempts >= 2:
+        risky = any(st.startswith(("upscaled", "Sauvola", "despeckled", "illumination")) for st in best["steps"])
+        if risky:
+            # the chosen transforms may have hurt: compare with the conservative representation
+            alt = attempt(False, "minimal", minimal=True)
+        elif best["score"] >= float(os.getenv("OCR_RETRY_FLOOR", "0.3")):
+            alt = attempt(not first_bin, "grey" if first_bin else "binarised")
+        else:
+            alt = None    # near-hopeless with an already minimal input (handwriting, photos): a retry only costs time
+        if alt and alt["score"] > best["score"] + 0.02:
             best = alt
     rotation = 0
     if best["score"] < 0.35 and max_attempts >= 3:
