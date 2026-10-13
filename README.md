@@ -204,7 +204,7 @@ These adapters could not be exercised here (no PyPI/model access in the build en
 ## Tests
 
 ```bash
-pytest -q                                   # 67 unit/integration tests, generated fixtures, ~1 min
+pytest -q                                   # 67 unit/integration tests on generated fixtures (~30 s; OCR tests need tesseract)
 OLMOCR_PATH=/path/to/olmocr pytest -m bench # regression on the official sample with the official test classes
 ```
 Covered: native text, scanned OCR (skew, noise, blur, low contrast, uneven light, small text; preprocessing never worse than plain OCR), two-column and sidebar reading order, header/footer classification (repeated headers, page numbers, first-page title, footnotes, section headings, documents without headers, configurability), equation boundaries/LaTeX/symbols/fallback, ruled tables with merged cells, borderless tables, prose rejection, Markdown escaping, hyphenation, Unicode/accents, empty/corrupt/encrypted/multi-page/image inputs, OCR timeout fallback, verifier independence/provenance, JSON and Markdown API responses, upload validation and cleanup, CLI batch/timeout, determinism. Failures name the PDF, page, test id and the scorer's explanation.
@@ -249,10 +249,11 @@ Hardware: Intel Xeon @ 2.80 GHz, 2 logical cores, 7.8 GB RAM, Linux; PyMuPDF 1.2
 | order | 46.2 | 84.6 |
 | present | 30.0 – 33.3 | 53.3 |
 | baseline / blank-page checks | 100 / 0–100 | 100 / 100 |
-| median latency (s/page) | 0.50 | **0.18** |
-| p90 / p95 / max (s/page) | 1.6–1.8 / 3.3 / 11.8–12.2 | 2.2 / 2.5 / 5.5 |
+| median latency (s/page) | 0.50 | **0.17** |
+| p90 / p95 / max (s/page) | 1.6–1.8 / 3.3 / 11.8–12.2 | 2.2 / 2.5 / 6.8 |
+| errors / timeouts | 0 / 0 | 0 / 0 (peak worker RSS 421 MB) |
 
-(v1 ranges cover the two ways of turning v1 output into Markdown: the frontend `md()` with provenance comments, and plain text. The scorer's printed "overall" averages the three JSONL groups of the sample — 44.8/78.1 vs 94.6 — and is not meaningful on this sample.) The remaining sample failures are handwriting (needs a vision model), errors already present in a scan's OCR, logo text inside an image, and one ambiguous card-layout order.
+(v1 ranges cover the two ways of turning v1 output into Markdown: the frontend `md()` with provenance comments, and plain text. The scorer's printed "overall" averages the three JSONL groups of the sample — 44.8/78.1 vs 94.6 — and is not meaningful on this sample.) Robustness check (not scored): the CLI converted all 37 PDFs in olmocr's `tests/gnarly_pdfs` (498 pages: rotated, image-only, broken text layers, maps, forms) with no failures, median 0.21 s/page, in 82 s on the same 2 cores. The remaining sample failures are handwriting (needs a vision model), errors already present in a scan's OCR, logo text inside an image, and one ambiguous card-layout order.
 
 **Is the score above 80 %?** On the official *sample* the main test file reaches 83.8 %, but that is in-sample and not the benchmark. A reproducible **full olmOCR-Bench score above 80 % has not been demonstrated**. For context, the olmocr README reports Marker 76.1, MinerU 75.2, DeepSeek-OCR 75.7 and Mistral OCR 72.0; the results above 80 (PaddleOCR-VL 80.0, olmOCR v0.4 82.4, Infinity-Parser 82.5, Chandra 83.1) come from neural vision-language models. The full set contains old-scan, handwriting and scanned-math material where an offline Tesseract pipeline is fundamentally limited. Run the full benchmark to get the real number.
 

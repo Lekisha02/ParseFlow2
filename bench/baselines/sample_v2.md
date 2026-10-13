@@ -22,7 +22,7 @@
 | present | 53.3 | 30 |
 | table | 100.0 | 20 |
 
-Latency per page (s): median 0.180 · p90 2.243 · p95 2.472 · max 5.469 · throughput 1.259 pages/s with 2 workers
+Latency per page (s): median 0.173 · p90 2.242 · p95 2.485 · max 6.839 · throughput 1.181 pages/s with 2 workers
 Errors: 0 · timeouts: 0
 
-Slowest documents: lincoln_letter.pdf (5.469s), blank_book_pg1.pdf (2.472s), test-graphical-text.pdf (2.243s), buildingnotes.pdf (1.925s), mattsnotes.pdf (0.541s)
+Slowest documents: lincoln_letter.pdf (6.839s), blank_book_pg1.pdf (2.485s), buildingnotes.pdf (2.242s), test-graphical-text.pdf (2.014s), openstax_caculus_pg_273.pdf (0.539s)

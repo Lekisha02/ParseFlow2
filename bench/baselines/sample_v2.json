@@ -1,5 +1,5 @@
 {
- "started": "2026-10-13T09:28:17.886445+00:00",
+ "started": "2026-10-13T09:42:26.602512+00:00",
  "candidate": "parseflow",
  "impl": "current",
  "legacy_md": null,
@@ -24,58 +24,59 @@
  "annotated_markdown": false,
  "timeout_s": 180,
  "latency": {
-  "per_page_median": 0.18034660899987406,
-  "per_page_p90": 2.242764387000534,
-  "per_page_p95": 2.471561981999912,
-  "per_page_max": 5.468816718999733,
-  "per_page_mean": 0.7194594829999539,
+  "per_page_median": 0.17288920100054384,
+  "per_page_p90": 2.242248096000367,
+  "per_page_p95": 2.4850594879999335,
+  "per_page_max": 6.838592379000147,
+  "per_page_mean": 0.7987726017778792,
   "documents": 21,
   "pages": 23,
-  "wall_seconds": 18.27,
+  "worker_peak_rss_mb": 421.28515625,
+  "wall_seconds": 19.48,
   "workers": 2,
-  "throughput_pages_per_s": 1.259,
+  "throughput_pages_per_s": 1.181,
   "method": "time inside each worker around the conversion call (excludes process spawn and imports); each document runs in a fresh process (cold caches); outputs written after timing"
  },
  "slowest": [
   {
    "pdf": "lincoln_letter.pdf",
-   "seconds": 5.469
+   "seconds": 6.839
   },
   {
    "pdf": "blank_book_pg1.pdf",
-   "seconds": 2.472
-  },
-  {
-   "pdf": "test-graphical-text.pdf",
-   "seconds": 2.243
+   "seconds": 2.485
   },
   {
    "pdf": "buildingnotes.pdf",
-   "seconds": 1.925
+   "seconds": 2.242
   },
   {
-   "pdf": "mattsnotes.pdf",
-   "seconds": 0.541
+   "pdf": "test-graphical-text.pdf",
+   "seconds": 2.014
   },
   {
    "pdf": "openstax_caculus_pg_273.pdf",
-   "seconds": 0.37
+   "seconds": 0.539
+  },
+  {
+   "pdf": "mattsnotes.pdf",
+   "seconds": 0.369
   },
   {
    "pdf": "headers_footers/fff590bed29a2854ac1f874dad5752ede1aa_pg1.pdf",
-   "seconds": 0.355
+   "seconds": 0.352
   },
   {
    "pdf": "headers_footers/ffaac214730d2b8c2ec842e3618ccb9c4259_pg1.pdf",
-   "seconds": 0.339
+   "seconds": 0.266
   },
   {
-   "pdf": "headers_footers/ff0f0b22c55d8b90dd77d153f48e144fc9db_pg2.pdf",
-   "seconds": 0.242
+   "pdf": "discoverworld_crazy_table4.pdf",
+   "seconds": 0.252
   },
   {
    "pdf": "headers_footers/ff4f7dad78081cff727d19ab51c181d4a661_pg1.pdf",
-   "seconds": 0.239
+   "seconds": 0.226
   }
  ],
  "errors": [],

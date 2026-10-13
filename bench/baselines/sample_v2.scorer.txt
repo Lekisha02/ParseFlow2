@@ -7,14 +7,14 @@ Candidate: parseflow
   [FAIL] Test mattsnotes_minediff_00 on mattsnotes page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'The-Stack-V2...' with threshold 1.0 but best match ratio was 0.750
   [FAIL] Test mattsnotes_minediff_01 on mattsnotes page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'SE, whatever we've scraped...' with threshold 1.0 but best match ratio was 0.654
   [FAIL] Test mattsnotes_minediff_02 on mattsnotes page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'HQ DCLM...' with threshold 1.0 but best match ratio was 0.714
-  [FAIL] Test mattsnotes_minediff_03 on mattsnotes page 2 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'Order by repo...' with threshold 1.0 but best match ratio was 0.538
   [FAIL] Test mattsnotes_minediff_04 on mattsnotes page 3 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'ARCH + TRAINING...' with threshold 1.0 but best match ratio was 0.933
+  [FAIL] Test mattsnotes_minediff_03 on mattsnotes page 2 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'Order by repo...' with threshold 1.0 but best match ratio was 0.538
   [FAIL] Test building_notes_00 on buildingnotes page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'master bath...' with threshold 1.0 but best match ratio was 0.625
-  [FAIL] Test building_notes_01 on buildingnotes page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'laundry...' with threshold 1.0 but best match ratio was 0.571
   [FAIL] Test building_notes_02 on buildingnotes page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'guest bath...' with threshold 1.0 but best match ratio was 0.400
-  [FAIL] Test lincoln_letter_minediff_00 on lincoln_letter page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'January 10th 1864....' with threshold 1.0 but best match ratio was 0.333
-  [FAIL] Test lincoln_letter_minediff_01 on lincoln_letter page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'Major General Hitchcock, Commissioner of...' with threshold 1.0 but best match ratio was 0.417
-  [FAIL] Test lincoln_letter_minediff_03 on lincoln_letter page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'He is also directed to send forward the ...' with threshold 1.0 but best match ratio was 0.450
+  [FAIL] Test building_notes_01 on buildingnotes page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'laundry...' with threshold 1.0 but best match ratio was 0.571
+  [FAIL] Test lincoln_letter_minediff_00 on lincoln_letter page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'January 10th 1864....' with threshold 1.0 but best match ratio was 0.389
+  [FAIL] Test lincoln_letter_minediff_01 on lincoln_letter page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'Major General Hitchcock, Commissioner of...' with threshold 1.0 but best match ratio was 0.500
+  [FAIL] Test lincoln_letter_minediff_03 on lincoln_letter page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'He is also directed to send forward the ...' with threshold 1.0 but best match ratio was 0.600
   [FAIL] Test mathfuncs_01 on mathfuncs page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Could not find a location where 'Pythagorean Theorem...' appears before 'The Fundamental Theorem of Calculus...'.
   [FAIL] Test test_graphical_text_00 on test-graphical-text page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'THE VISION...' with threshold 1.0 but best match ratio was 0.737
   [FAIL] Test test_graphical_text_01 on test-graphical-text page 1 average pass ratio: 0.000 (0/1 repeats passed). Ex: Expected 'by FutureSkill...' with threshold 1.0 but best match ratio was 0.214
