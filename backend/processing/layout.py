@@ -15,6 +15,50 @@ HYPHEN_KEEP_PREFIX = {"self", "non", "well", "ill", "ex", "all", "half", "cross"
                       "time", "user", "data", "end", "open", "close", "first", "second", "third", "one", "two", "three", "four", "five"}
 
 
+ENUM_ONLY = re.compile(r"^\s*\(?\d{1,3}[.):]\s*$")
+_CODE_OPS = [r"->", r"==|!=", r"<=|>=", r"&&|\|\|", r"\+\+|--(?=\w)|(?<=\w)--", r"::", r";\s*$", r"[{}]", r"\w\[[^\]]*\]"]
+_CODE_KEYWORDS = re.compile(r"^\s*(?:\d{1,3}[.):]\s*)?(?:if|else|elif|else if|for|foreach|while|do|return|break|continue|switch|case|def|class|"
+                            r"int|void|float|double|char|struct|public|private|static|import|from|print|printf|cout|let|var|const|function|"
+                            r"begin|end|then|repeat|until|procedure|algorithm|input|output|null|true|false|endif|endwhile|endfor)\b", re.I)
+
+
+def code_score(line):
+    """How code-like one line of text is (0..1). Pseudo-code ('If (root == NULL)', 'root -> left = f(x)') scores high,
+    prose ('the root of the tree is ...') low. Used to keep code out of the inline-math converter and out of tables."""
+    t = (line or "").strip()
+    t = re.sub(r"^\(?\d{1,3}[.):]\s+", "", t)          # a leading line number says nothing either way
+    if not t:
+        return 0.0
+    s = 0.0
+    ops = sum(1 for o in _CODE_OPS if re.search(o, t))
+    s += min(0.6, 0.3 * ops)
+    if re.match(r"^(//|/\*|#\s|--\s)", t):
+        s += 0.45                                     # a comment line
+    if _CODE_KEYWORDS.match(t):
+        s += 0.35
+    if re.search(r"\b[A-Za-z_]\w*\(", t):
+        s += 0.15                                     # call / function application
+    if re.search(r"\b[a-z]+_[a-z_]+\b|\b[a-z]+[A-Z]\w*\(|\b[A-Z][a-z]+[A-Z]\w*\(", t):   # snake_case / camelCase calls
+        s += 0.3
+    if re.search(r"\b\w+\s*=\s*[\w(]", t) and not re.search(r"[.!?]\s*$", t):
+        s += 0.15
+    hard = re.search(r"->|==|!=|&&|\|\||;\s*$|[{}]|//", t)
+    if len(re.findall(r"\b[A-Za-z]{2,}\b", t)) > 8 and not hard:
+        s -= 0.5                                     # a sentence
+    elif re.search(r"[a-z]{2,}[.!?]\s*$", t) or (re.search(r"[.!?]\s*$", t) and len(re.findall(r"\b[a-z]{2,}\b", t)) >= 3 and not hard):
+        s -= 0.4                                     # ends like a sentence
+    return max(0.0, min(1.0, s))
+
+
+def is_code_lines(lines):
+    """True when (nearly) all lines are code-like."""
+    ls = [l for l in lines if l and l.strip() and not ENUM_ONLY.match(l)]
+    if not ls:
+        return False
+    sc = [code_score(l) for l in ls]
+    return all(v >= 0.3 for v in sc) and sum(1 for v in sc if v >= 0.45) >= max(1, 0.5 * len(ls))
+
+
 @dataclass
 class Region:
     """A non-text item placed in reading order (table, figure, display equation)."""
@@ -75,7 +119,8 @@ def reading_order(items, body_size=10.0, _depth=0):
     x0 = min(i.bbox[0] for i in items); x1 = max(i.bbox[2] for i in items)
     W = max(1.0, x1 - x0)
     min_gutter = max(4.0, 0.55 * body_size)
-    narrow = [i for i in items if _w(i.bbox) < 0.8 * W]
+    # a bare list number ('12.') belongs to the text after it: it must not create a 'gutter' of its own
+    narrow = [i for i in items if _w(i.bbox) < 0.8 * W and not (_is_text(i) and ENUM_ONLY.match(i.text or ""))]
     gutters = []
     if len(narrow) >= 2:
         for a, b in _gaps([(i.bbox[0], i.bbox[2]) for i in narrow], min_gutter):
@@ -192,6 +237,7 @@ def _row_alignment(cols, body_size):
 def _column_is_text(col, body_size):
     if any(not _is_text(i) for i in col):
         return True
+    col = [i for i in col if not ENUM_ONLY.match(i.text or "")] or col
     lens = [_len(i) for i in col]
     widths = [_w(i.bbox) for i in col]
     return len(col) >= 2 and statistics.median(lens) >= 18 and statistics.median(widths) >= 8 * body_size
@@ -204,6 +250,17 @@ def _column_is_text(col, body_size):
 class Para:
     lines: list = field(default_factory=list)   # Segments
     kind: str = "paragraph"
+    code: bool = False                           # set by merge_code: consecutive pseudo-code lines
+
+    def visual_lines(self):
+        """Segments grouped into visual lines (top to bottom), each sorted left to right."""
+        out = []
+        for l in sorted(self.lines, key=lambda l: (l.baseline, l.bbox[0])):
+            if out and abs(out[-1][0].baseline - l.baseline) < 0.35 * max(l.size, out[-1][0].size, 0.1):
+                out[-1].append(l)
+            else:
+                out.append([l])
+        return [sorted(v, key=lambda l: l.bbox[0]) for v in out]
 
     @property
     def bbox(self):
@@ -245,20 +302,86 @@ def assemble_paragraphs(ordered, body_size):
         else:
             flush(); cur = Para([it])
     flush()
+    return merge_code(out, body_size)
+
+
+def merge_code(items, body_size):
+    """Merge runs of consecutive code-like paragraphs (numbered pseudo-code lines arrive as one 'list item' each)
+    into a single code paragraph, so an algorithm stays one block in reading order. Needs >= 3 lines."""
+    def texts(p):
+        return [" ".join(s.text for s in v) for v in p.visual_lines()]
+
+    def codey(p):          # every line at least weakly code-like
+        if not isinstance(p, Para) or len(p.lines) > 60:
+            return False
+        ts = [t for t in texts(p) if not ENUM_ONLY.match(t)]
+        return bool(ts) and all(code_score(t) >= 0.3 for t in ts)
+    out, i = [], 0
+    while i < len(items):
+        p = items[i]
+        if not codey(p):
+            out.append(p); i += 1; continue
+        run = [p]
+        j = i + 1
+        while j < len(items) and codey(items[j]):
+            a, b = run[-1].bbox, items[j].bbox
+            sz = max(run[-1].size, items[j].size, 0.1)
+            gap = b[1] - a[3]
+            if gap > 1.6 * sz or gap < -0.6 * sz or abs(items[j].size - run[-1].size) > 0.18 * sz:
+                break
+            if min(a[2], b[2]) - max(a[0], b[0]) < -2 * sz and abs(b[0] - a[0]) > 6 * sz:
+                break                                  # another column
+            run.append(items[j]); j += 1
+        lines_ = [t for r in run for t in texts(r)]
+        if len(lines_) >= 3 and is_code_lines(lines_):
+            out.append(Para([l for r in run for l in r.lines], kind="code", code=True))
+        else:
+            out.extend(run)
+        i = j
     return out
+
+
+def code_text(para):
+    """Code paragraph text with the source indentation kept (leading spaces, 4 per indent step);
+    a leading line number stays at the start of its line."""
+    rows = []
+    for v in para.visual_lines():
+        num, rest = "", v
+        if len(v) > 1 and ENUM_ONLY.match(v[0].text):
+            num, rest = v[0].text.strip(), v[1:]
+        x = rest[0].bbox[0]
+        m = re.match(r"^\s*(\d{1,3}[.):])\s+(.*)$", rest[0].text) if not num else None
+        text = " ".join(s.text.strip() for s in rest)
+        if m:
+            num, text = m.group(1), " ".join([m.group(2)] + [s.text.strip() for s in rest[1:]])
+            # the indent of an inline-numbered line is where its text starts: estimate from the number's width
+            x = rest[0].bbox[0] + (len(m.group(0)) - len(m.group(2))) * 0.5 * rest[0].size
+        rows.append((num, x, text, max(s.size for s in v)))
+    xs = sorted({round(r[1], 1) for r in rows if r[2].strip()})
+    base = xs[0] if xs else 0
+    steps = sorted(d for d in {round(x - base, 1) for x in xs} if d > 1.5)
+    step = steps[0] if steps else 1
+    out = []
+    numw = max((len(r[0]) for r in rows), default=0)
+    for num, x, text, sz in rows:
+        lvl = int(round((x - base) / step)) if step > 1 else 0
+        pre = (num.ljust(numw) + " ") if numw else ""
+        out.append((pre + "    " * max(0, lvl) + text).rstrip())
+    return "\n".join(out)
 
 
 def _continues(para, last, seg, body):
     sz = max(seg.size, 0.1); lsz = max(last.size, 0.1)
     same_line = abs(seg.baseline - last.baseline) < 0.35 * max(sz, lsz) and seg.bbox[0] >= last.bbox[2] - 0.5 * sz
     if same_line:
-        return seg.bbox[0] - last.bbox[2] < 1.5 * max(sz, lsz)
+        reach = 8.0 if ENUM_ONLY.match(last.text or "") else 1.5     # '12.'  <hanging indent>  text
+        return seg.bbox[0] - last.bbox[2] < reach * max(sz, lsz)
     small_attached = sz < 0.85 * lsz and seg.bbox[1] < last.bbox[3] and seg.bbox[3] > last.bbox[1]
     if small_attached:     # sub/superscript run hanging off the previous line
         return True
     if abs(sz - lsz) > 0.18 * max(sz, lsz):
         return False
-    if BULLET.match(seg.text) and len(seg.text) > 2:
+    if (BULLET.match(seg.text) and len(seg.text) > 2) or ENUM_ONLY.match(seg.text or ""):
         return False
     if last.bold and not seg.bold and all(l.bold for l in para.lines):
         return False                                   # bold heading line(s) followed by body text
@@ -348,7 +471,7 @@ def classify(para, body_size, heading_sizes, body_sizes=()):
     """Return (type, level) for an assembled paragraph."""
     text = " ".join(l.text for l in para.lines).strip()
     n = len(para.lines)
-    if para.mono and n >= 2:
+    if (para.mono and n >= 2) or getattr(para, "code", False):
         return "code", 0
     if CAPTION.match(text) and len(text) < 400:
         return "caption", 0

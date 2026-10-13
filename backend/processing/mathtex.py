@@ -113,9 +113,17 @@ def _math_alnum(c):
     return None
 
 
+SUPERS = dict(zip("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱ", "0123456789+-=()ni"))
+SUBS = dict(zip("₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₙₘₖₗₚₛₜ", "0123456789+-=()aeoxnmklpst"))
+
+
 def token(ch):
     """Return (latex, ok) for one glyph. ok=False for glyphs we cannot map."""
     c = ch.c
+    if c in SUPERS:
+        return "^{" + SUPERS[c] + "}", True
+    if c in SUBS:
+        return "_{" + SUBS[c] + "}", True
     if c in GREEK:
         return "\\" + GREEK[c], True
     if c in SYMBOLS:
@@ -203,6 +211,10 @@ def build_latex(chars, hrules=(), display=False):
 
 def _post(s):
     s = re.sub(r"\s+", " ", s).strip()
+    # Unicode script characters arrive one by one: x ^{2} ^{3} -> x^{23}; and attach to the preceding atom
+    for k in ("^", "_"):
+        s = re.sub(r"(?:\s*\%s\{([^{}]*)\}){2,}" % k, lambda m: k + "{" + "".join(re.findall(r"\%s\{([^{}]*)\}" % k, m.group(0))) + "}", s)
+        s = re.sub(r"\s+\%s\{" % k, k + "{", s)
     s = re.sub(r"\\operatorname\{(" + "|".join(sorted(FUNCS, key=len, reverse=True)) + r")\}", r"\\\1", s)
     s = s.replace(r"\Pr", r"\Pr").replace(r"\mod", r"\bmod")
     return s
@@ -428,6 +440,8 @@ def _is_strong(c, main):
         return True
     if MATH_FONT.search(c.font) and not TEXTY_SYMBOL_FONT.search(c.font) and c.c.strip() and c.c not in _TEXT_PUNCT:
         return True
+    if len(c.c) != 1:                 # multi-code-point glyphs (ligatures, combining sequences) are text
+        return False
     cp = ord(c.c)
     return 0x2200 <= cp <= 0x22FF or 0x1D400 <= cp <= 0x1D7FF or 0x27C0 <= cp <= 0x27EF or 0x2980 <= cp <= 0x2AFF
 

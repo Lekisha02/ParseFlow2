@@ -84,6 +84,12 @@ On digital PDFs the LaTeX is rebuilt from the text layer: Unicode→LaTeX symbol
 
 ---
 
+### Ask Your Document (`processing/ask.py`)
+Answers are **copied from extracted blocks, never generated** (no model, no API key). The question is matched with BM25 over blocks plus the heading each block sits under, phrase and definition bonuses (`... is called ...`), and stemming that handles `debugging`/`debug`. Four strategies: *page* ("What does page 4 explain?"), *table cell* (row label × column header), *section* (the question names a heading → the heading with its content) and *passage* (the best sentences, a code step such as `// Right Heavy Case` with the lines under it, a term with the description beside it, or a passage the layout split across blocks joined back together). Math stays LaTeX with `\( \)` delimiters and the viewer renders it with a vendored KaTeX (`frontend/vendor/katex`, works offline); code keeps its line numbers and indentation; tables are rendered as tables. Every answer lists its evidence blocks with **View Source**.
+
+### Long documents
+A 400-page PDF is processed in slices of `PARSEFLOW_PAGE_CHUNK` pages: each slice is analysed, routed and extracted, then its glyph data and page bitmaps are released; the processing screen shows `page N of M` for each stage. Digital pages are not rasterised during processing — the viewer requests page images and thumbnails on demand (lazy-loaded), and the long lists in the viewer (Blocks, Tables, Visuals, JSON) render in pages with *Show more*. Measured on a 400-page, 13 MB mixed test PDF (398 digital pages, 6,644 blocks, 2 vCPU container): peak memory **362 MB** (was 3.7 GB with every page bitmap held), API upload → viewer open **71 s**, document JSON 9 MB. Scanned pages are OCR'd one by one and take far longer than digital pages.
+
 ## Digital Twin (JSON)
 
 All v1 fields are unchanged. Example block:
@@ -167,7 +173,9 @@ print(doc["markdown"])
 | `GET /api/status/{id}` | `status`, `stages`, `error`, **`timings`** |
 | `GET /api/document/{id}` | Digital Twin JSON (now includes `markdown`) |
 | `GET /api/document/{id}/markdown` | **new**: canonical Markdown; `?include_furniture=1` restores headers/footers, `?annotate=0` drops HTML-comment warnings |
-| `GET /api/page/{id}/{n}.png` | rendered page image for the viewer |
+| `GET /api/page/{id}/{n}.png` | page image for the viewer; rendered on first request and cached (digital pages are not rasterised during processing) |
+| `GET /api/thumb/{id}/{n}.jpg` | **new**: small JPEG thumbnail for the page strip, rendered on demand and cached |
+| `GET /api/ask/{id}?q=...` | **new**: Ask Your Document — extractive answer (`parts` typed as text with inline LaTeX, math, code, list, table, heading), `strategy` (page · table cell · section · passage), `evidence` with block ids, `confidence`, matched/missing terms; `found=false` with the closest passages when nothing matches |
 
 Uploads that fail validation are deleted immediately; processed documents expire after `PARSEFLOW_JOB_TTL_HOURS` (default 24). The frontend renders the backend Markdown (with an *include running headers/footers* toggle) and keeps its own `md()` only for demo/browser mode.
 
@@ -178,8 +186,9 @@ Uploads that fail validation are deleted immediately; processed documents expire
 | Variable | Default | Purpose |
 |---|---|---|
 | `VISION_PROVIDER`, `VISION_API_KEY`, `VISION_MODEL`, `MAX_VISION_REGIONS` | gemini, –, provider default, 12 | optional vision model (never required) |
-| `MAX_PAGES` | 60 | page limit per document |
-| `MAX_UPLOAD_MB` | 50 | API upload limit |
+| `MAX_PAGES` | 1000 | page limit per document (was 60) |
+| `MAX_UPLOAD_MB` | 300 | API upload limit (was 50) |
+| `PARSEFLOW_PAGE_CHUNK` | 25 | pages analysed + extracted per slice; memory is bounded by the slice, not the document |
 | `OCR_LANG` | eng | Tesseract language(s), e.g. `eng+deu` |
 | `OCR_TIMEOUT` | 60 | seconds per Tesseract call |
 | `OCR_MAX_ATTEMPTS` | 2 | bounded OCR fallback attempts (3 enables OSD rotation) |
@@ -304,6 +313,8 @@ PARSERFLOWS/
 * Borderless tables with irregular layouts or tables spanning pages may be split or merged imperfectly (marked `review`).
 * Card/grid layouts can be read column-wise where row-wise was intended.
 * OCR quality on degraded historic scans is bounded by Tesseract.
+* Ask is extractive keyword/heading/table matching: it does not paraphrase, summarise across sections or answer questions whose words are not in the document.
+* The CLI's default per-document timeout (`-t 300`) can be too short for long scanned documents; raise it for those.
 
 ## Team
 

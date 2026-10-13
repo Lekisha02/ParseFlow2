@@ -14,10 +14,11 @@ try:
 except FileNotFoundError: pass
 from processing import pipeline, ocr, vision, recognizers
 from processing import markdown as mdgen
+from processing import ask as askmod
 
 VERSION = "2.0.0"
 DATA = Path(os.getenv("PARSEFLOW_DATA_DIR", str(ROOT/"data"))); DATA.mkdir(parents=True, exist_ok=True)
-MAX_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50"))*1024*1024
+MAX_BYTES = int(os.getenv("MAX_UPLOAD_MB", "300"))*1024*1024
 JOB_TTL = float(os.getenv("PARSEFLOW_JOB_TTL_HOURS", "24"))*3600
 ALLOWED = {"pdf", "png", "jpg", "jpeg"}
 JOBS = {}; POOL = ThreadPoolExecutor(int(os.getenv("PARSEFLOW_WORKERS", "2")))
@@ -42,7 +43,7 @@ def health():
         import pymupdf; pm = pymupdf.VersionBind
     except Exception: pm = None
     return dict(ok=True, version=VERSION, ocr=ocr.available(), vision=vision.info(), math_recognizer=recognizers.info(), pymupdf=pm,
-                max_upload_mb=MAX_BYTES//(1024*1024), max_pages=int(os.getenv("MAX_PAGES", "60")))
+                max_upload_mb=MAX_BYTES//(1024*1024), max_pages=int(os.getenv("MAX_PAGES", "1000")))
 
 @app.post("/api/process")
 async def process(file: UploadFile = File(...)):
@@ -69,7 +70,7 @@ async def process(file: UploadFile = File(...)):
     except Exception: shutil.rmtree(d, True); return err("PF-201", "Corrupt Document", "The file could not be read.")
     prog = pipeline.Progress(); JOBS[doc_id] = dict(prog=prog, doc=None, started=time.time())
     def run():
-        try: JOBS[doc_id]["doc"] = pipeline.process(str(src), name, doc_id, str(d), prog); prog.status = "complete"
+        try: JOBS[doc_id]["doc"] = pipeline.process(str(src), name, doc_id, str(d), prog, save_images="needed"); prog.status = "complete"
         except pipeline.PFError as e: prog.status, prog.error = "failed", e.dict()
         except Exception as e: prog.status, prog.error = "failed", dict(code="PF-500", title="Processing Error", message=f"Unexpected failure ({type(e).__name__}); the server is still running.")
         finally: JOBS[doc_id]["doc"] = None   # the result lives in document.json; keep memory bounded
@@ -97,10 +98,67 @@ def document_markdown(doc_id: str, include_furniture: bool = Query(False), annot
     doc = json.loads(p.read_text())
     return PlainTextResponse(mdgen.render(doc, include_furniture=include_furniture, annotate=annotate), media_type="text/markdown; charset=utf-8")
 
+@app.get("/api/ask/{doc_id}")
+def ask_document(doc_id: str, q: str = Query("", max_length=500)):
+    """Extractive answer to a question about a processed document: parts copied from blocks, with evidence."""
+    p = DATA/doc_id/"document.json"
+    if not _safe_id(doc_id) or not p.exists(): return err("PF-404", "Not Ready", "Document not available.", 404)
+    key = (doc_id, p.stat().st_mtime)
+    doc = None if key in askmod._CACHE else json.loads(p.read_text())
+    return askmod.answer(doc, q, key=key)
+
+RENDER_LOCK = threading.Lock()
+THUMB_W = 180
+
+def _source(doc_id):
+    d = DATA/doc_id
+    src = next(iter(sorted(d.glob("source_*"))), None) if d.is_dir() else None
+    return d, src
+
+def _page_image(doc_id, n, thumb=False):
+    """Page bitmaps are rendered on first request and cached next to the document (a 400-page upload is not
+    rasterised up front). Full pages are PNG at the viewer scale; thumbnails are small JPEGs."""
+    d, src = _source(doc_id)
+    out = d/(f"thumb_{n}.jpg" if thumb else f"page_{n}.png")
+    if out.exists(): return out
+    full = d/f"page_{n}.png"
+    if src is None or not (d/"document.json").exists(): return None
+    with RENDER_LOCK:
+        if out.exists(): return out
+        from PIL import Image
+        name = src.name.split("_", 2)[-1]
+        if thumb and full.exists():
+            im = Image.open(full); im.load()
+        else:
+            kind, s = pipeline.open_source(str(src), name)
+            try:
+                if kind == "pdf":
+                    if not 1 <= n <= s.page_count: return None
+                    w = s[n - 1].rect.width or 612
+                    im = pipeline.render_page(s, n, zoom=(THUMB_W * 2 / w) if thumb else None)
+                else:
+                    if n != 1: return None
+                    im = s
+            finally:
+                if kind == "pdf": s.close()
+        tmp = out.with_suffix(".tmp")
+        if thumb:
+            im = im.convert("RGB"); im.thumbnail((THUMB_W * 2, THUMB_W * 4)); im.save(tmp, "JPEG", quality=72)
+        else:
+            im.save(tmp, "PNG", compress_level=1)
+        os.replace(tmp, out)
+    return out
+
 @app.get("/api/page/{doc_id}/{n}.png")
 def page_png(doc_id: str, n: int):
-    p = DATA/doc_id/f"page_{n}.png"
-    if not _safe_id(doc_id) or not p.exists(): return err("PF-404", "Not Found", "Page image not found.", 404)
-    return FileResponse(p, media_type="image/png")
+    p = _page_image(doc_id, n) if _safe_id(doc_id) else None
+    if p is None: return err("PF-404", "Not Found", "Page image not found.", 404)
+    return FileResponse(p, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})
+
+@app.get("/api/thumb/{doc_id}/{n}.jpg")
+def page_thumb(doc_id: str, n: int):
+    p = _page_image(doc_id, n, thumb=True) if _safe_id(doc_id) else None
+    if p is None: return err("PF-404", "Not Found", "Page image not found.", 404)
+    return FileResponse(p, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 app.mount("/", StaticFiles(directory=str(ROOT/"frontend"), html=True), name="ui")

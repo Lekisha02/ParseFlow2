@@ -47,7 +47,17 @@ SECTION = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?|[IVX]+\.|[A-Z]\.)\s+[A-Z][^\s]*(?
 
 def _norm(t):
     t = re.sub(r"\d+", "#", (t or "").lower())
-    return re.sub(r"[\W_]+", " ", t).strip()
+    t = re.sub(r"[\W_]+", " ", t).strip()
+    # a page number on the outer edge moves sides between even and odd pages ('310 Chapter 17' / 'Chapter 17 311')
+    return re.sub(r"^(?:# )+|(?: #)+$", "", t).strip() or t
+
+
+def _rep_hits(rep, k, zone, pi, cy_rel, n_pages):
+    """Other pages with the same normalised text in the same band at (nearly) the same height. In long documents a
+    running header only spans its chapter, so the requirement is capped at 4 pages instead of 30% of the document."""
+    hits = len({p for p, c in rep[(k, zone)] if p != pi and abs(c - cy_rel) < 0.03})
+    need = min(0.3 * (n_pages - 1), 4)
+    return hits, hits >= 1 and hits >= need
 
 
 def enabled():
@@ -67,7 +77,7 @@ def classify(pages, body_size):
             zone = "top" if cy < 0.2 * H else "bottom" if cy > 0.8 * H else "mid"
             k = _norm(it["text"])
             if k and zone != "mid":
-                rep[(k, zone)].add(pi)
+                rep[(k, zone)].add((pi, round(cy / H, 3)))
 
     out = {}
     for pi, p in enumerate(pages):
@@ -144,9 +154,10 @@ def classify(pages, body_size):
             # repetition across pages
             k = _norm(text)
             zone = "top" if cy < 0.2 * H else "bottom" if cy > 0.8 * H else "mid"
+            repeats = False
             if n_pages >= 2 and k and zone != "mid":
-                hits = len(rep[(k, zone)] - {pi})
-                if hits >= 1 and hits >= 0.3 * (n_pages - 1):
+                hits, repeats = _rep_hits(rep, k, zone, pi, cy / H, n_pages)
+                if repeats:
                     score += 0.8; reasons.append(f"repeats on {hits} other page(s)"); strong = True
             if FURNITURE.search(text):
                 score += 0.55; reasons.append("publication/boilerplate pattern (URL, DOI, copyright, journal, date, revision...)")
@@ -162,12 +173,14 @@ def classify(pages, body_size):
                 score -= 0.45; reasons.append("fairly long text")
             if CAPTION.match(text):
                 score -= 1.0; reasons.append("caption")
-            if bottom and FOOTNOTE.match(text) and not FURNITURE.search(text):
+            if bottom and FOOTNOTE.match(text) and not FURNITURE.search(text) and not repeats:
                 score -= 0.8; reasons.append("footnote (marker + sentence)")
-            if sz >= 1.3 * body_size and top and not FURNITURE.search(text) and not PAGE_NUM.match(text) and not with_pnum:
-                hits = len(rep[(k, zone)] - {pi}) if n_pages >= 2 else 0
-                if hits == 0:
-                    score -= 0.8; reasons.append("large one-off text (title/heading)")
+            if sz >= 1.3 * body_size and top and not FURNITURE.search(text) and not PAGE_NUM.match(text) and not with_pnum and not repeats:
+                score -= 0.8; reasons.append("large one-off text (title/heading)")
+            elif n_pages >= 3 and top and sz >= 1.05 * body_size and not repeats and not FURNITURE.search(text) \
+                    and not PAGE_NUM.match(text) and not NUM_WITH_TITLE.match(text) and not with_pnum:
+                # long document: a heading-sized line that appears on no other page is that page's title, not a running head
+                score -= 0.35; reasons.append("heading-sized text that does not repeat on other pages (page title)")
             if SECTION.match(text) and not PAGE_NUM.match(text) and not FURNITURE.search(text) and top:
                 score -= 0.5; reasons.append("looks like a section heading")
             if not strong and score >= REMOVE:

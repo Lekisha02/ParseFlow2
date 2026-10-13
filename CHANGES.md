@@ -31,3 +31,15 @@ frontend features, upload workflow and downloads are kept; JSON changes are addi
 | `.github/workflows/ci.yml` | CI: tests + sample regression gate (written, not executed here). |
 
 `backend/processing/pdf_parser.py` and `vision.py` are unchanged (pdf_parser is no longer used by the pipeline).
+
+
+## v2.1 — Ask, readable math, long documents
+| File | Change |
+|---|---|
+| `backend/processing/ask.py` (new) | Extractive Ask engine (BM25 + section context, phrase/definition bonuses, table-cell lookup, page overviews, code-step excerpts, term/description rows, split-passage joining); typed answer parts with LaTeX kept for rendering. |
+| `backend/app.py` | `GET /api/ask/{id}`; page images and thumbnails rendered on demand (`/api/page`, new `/api/thumb`); limits raised to 1000 pages / 300 MB. |
+| `backend/processing/pipeline.py` | Pages processed in slices with per-page progress; glyph data and bitmaps released after each slice; verifier crops loaded lazily (same results); `save_images="needed"`. |
+| `backend/processing/headers_footers.py` | Repetition measured at the same height and capped at 4 pages for long documents; page numbers that swap sides on even/odd pages; heading-sized one-off page titles kept in long documents. |
+| `backend/processing/layout.py`, `tables.py`, `mathtex.py` | Numbered pseudo-code / enumerated listings are not tables; code paragraphs keep indentation and skip inline math; Unicode super/subscripts in LaTeX; crash on multi-code-point glyphs fixed. |
+| `frontend/index.html`, `frontend/vendor/katex/` | Ask tab uses the API and renders math (KaTeX, vendored), code, lists and tables, with evidence snippets and suggested questions from the document; math rendered in Inspector/Blocks/Tables; lazy thumbnails, paged long lists, server-side upload limit. The post-upload screens look the same. |
+| `tests/test_ask_and_large_docs.py` (new) | Ask answers, API, on-demand images, slice equivalence, page progress, long-document furniture. |

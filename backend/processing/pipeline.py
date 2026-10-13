@@ -58,7 +58,7 @@ def _stage(prog, name, timings):
     prog.set(name, "running")
     t0 = time.perf_counter()
     yield
-    timings[name] = round(time.perf_counter() - t0, 4)
+    timings[name] = round(timings.get(name, 0.0) + time.perf_counter() - t0, 4)
 
 
 def _env_int(k, d):
@@ -497,7 +497,7 @@ def process(path, filename, doc_id, out_dir, prog, save_images=True, include_fur
     timings = prog.timings if hasattr(prog, "timings") else {}
     t_all = time.perf_counter()
     state = dict(vision_left=_env_int("MAX_VISION_REGIONS", 12), vision_used=0, region_ocr_left=_env_int("MAX_REGION_OCR", 6))
-    max_pages = _env_int("MAX_PAGES", 60); warnings = []
+    max_pages = _env_int("MAX_PAGES", 1000); warnings = []
     ocr_ok = bool(ocr.available()); state["ocr_ok"] = ocr_ok
     os.makedirs(out_dir, exist_ok=True)
 
@@ -509,63 +509,36 @@ def process(path, filename, doc_id, out_dir, prog, save_images=True, include_fur
             warnings.append(f"Document has {n_pages} pages; only the first {max_pages} were processed."); n_pages = max_pages
     prog.set("DETECT", "done", f"{kind.upper()} · {n_pages} page{'s' if n_pages > 1 else ''}")
 
-    # ANALYZE --------------------------------------------------------------------------------
-    pages, page_ctx = [], []
-    with _stage(prog, "ANALYZE", timings):
-        for i in range(n_pages):
-            n = i + 1
-            ctx = dict(n=n, pdf_page=None, img=None, items=[], route=None, reason="", per_page_s=0.0)
-            t0 = time.perf_counter()
-            try:
-                if kind == "pdf":
-                    p = src[i]; ctx["pdf_page"] = p
-                    a = analyze_page(p)
-                    route, reason = route_page(a, ocr_ok)
-                    W, H = p.rect.width, p.rect.height
-                else:
-                    a = dict(segs=[], chars=0, invisible=0, image_coverage=1.0, text_quality=0.0, quality_detail={}, img_zoom=0, hidden_text="",
-                             W=src.width / Z, H=src.height / Z)
-                    route, reason = ("ocr" if ocr_ok else "unreadable"), "image file"
-                    W, H = a["W"], a["H"]
-                ctx.update(a=a, route=route, reason=reason, W=W, H=H)
-                if route in ("digital", "embedded_ocr"):
-                    _analyze_digital(ctx, a["segs"] if route == "digital" else _hidden_segments(ctx["pdf_page"]), warnings)
-                ctx["per_page_s"] += time.perf_counter() - t0
-            except Exception as e:
-                ctx.update(route="error", reason=f"analysis failed ({type(e).__name__})", W=ctx.get("W", 612), H=ctx.get("H", 792), a=dict(chars=0, image_coverage=0, text_quality=0))
-                warnings.append(f"Page {n}: analysis failed ({type(e).__name__}); page preserved.")
-            page_ctx.append(ctx)
-    prog.set("ANALYZE", "done", f"{sum(len(c['items']) for c in page_ctx)} regions identified on digital pages")
-
-    # ROUTE ----------------------------------------------------------------------------------
-    with _stage(prog, "ROUTE", timings):
-        cnt = {r: sum(1 for c in page_ctx if c["route"] == r) for r in ("digital", "embedded_ocr", "ocr", "unreadable", "error")}
+    # ANALYZE / ROUTE / EXTRACT, in slices of pages -------------------------------------------
+    # Pages are independent until ASSEMBLE, so a long document is handled CHUNK pages at a time: each slice is
+    # analysed, routed and extracted, then its glyph data and page images are released. Memory stays bounded by the
+    # slice, not the document (a 400-page report no longer holds 400 pages of glyphs and bitmaps at once).
+    chunk = max(1, _env_int("PARSEFLOW_PAGE_CHUNK", 25))
+    page_ctx, per_page = [], {}
+    cnt = dict.fromkeys(("digital", "embedded_ocr", "ocr", "unreadable", "error"), 0)
+    n_regions = n_blocks = 0
+    of = f" of {n_pages}" if n_pages > 1 else ""
+    for start in range(0, n_pages, chunk):
+        sl = []
+        with _stage(prog, "ANALYZE", timings):
+            for i in range(start, min(n_pages, start + chunk)):
+                prog.set("ANALYZE", "running", f"page {i + 1}{of}")
+                sl.append(_analyze_one(i, kind, src, ocr_ok, warnings))
+        n_regions += sum(len(c["items"]) for c in sl)
+        with _stage(prog, "ROUTE", timings):
+            for c in sl:
+                cnt[c["route"]] = cnt.get(c["route"], 0) + 1
+        prog.set("ROUTE", "running", " · ".join(f"{k} {v}" for k, v in cnt.items() if v))
+        with _stage(prog, "EXTRACT", timings):
+            for ctx in sl:
+                prog.set("EXTRACT", "running", f"page {ctx['n']}{of}")
+                per_page[ctx["n"]] = _extract_one(ctx, kind, src, out_dir, save_images, warnings, state)
+                n_blocks += len(per_page[ctx["n"]])
+                _release(ctx, kind)
+        page_ctx.extend(sl)
+    prog.set("ANALYZE", "done", f"{n_regions} regions identified on digital pages")
     prog.set("ROUTE", "done", " · ".join(f"{k} {v}" for k, v in cnt.items() if v))
-
-    # EXTRACT --------------------------------------------------------------------------------
-    per_page = {}
-    with _stage(prog, "EXTRACT", timings):
-        for ctx in page_ctx:
-            t0 = time.perf_counter()
-            n = ctx["n"]
-            need_img = save_images or ctx["route"] in ("ocr",) or any(it["kind"] in ("figure",) for it in ctx["items"])
-            if need_img:
-                ctx["img"] = _render(ctx, kind, src)
-                if save_images:
-                    ctx["img"].save(os.path.join(out_dir, f"page_{n}.png"), compress_level=1)
-            try:
-                if ctx["route"] == "ocr":
-                    _extract_ocr(ctx, warnings, state)
-                elif ctx["route"] == "unreadable":
-                    warnings.append(f"Page {n}: OCR engine unavailable; scanned content cannot be read.")
-                    ctx["items"].append(dict(kind="figure", bbox=(0, 0, ctx["W"], ctx["H"]), hint="unknown"))
-                per_page[n] = _blocks_for_page(ctx, state)
-            except Exception as ex:
-                b = make_block("", "unknown", n, scale((0, 0, ctx["W"], ctx["H"])), 0.0, "heuristic (estimated)", "fallback", None, preserved_image=True)
-                b["warnings"].append(f"Extractor error ({type(ex).__name__}) — page preserved, flagged.")
-                per_page[n] = [b]
-            ctx["per_page_s"] += time.perf_counter() - t0
-    prog.set("EXTRACT", "done", f"{sum(len(v) for v in per_page.values())} blocks")
+    prog.set("EXTRACT", "done", f"{n_blocks} blocks")
 
     # ASSEMBLE (furniture classification across the document, ids, captions) ----------------------
     blocks = []
@@ -610,16 +583,25 @@ def process(path, filename, doc_id, out_dir, prog, save_images=True, include_fur
 
     # VERIFY ---------------------------------------------------------------------------------
     with _stage(prog, "VERIFY", timings):
+        by_page = {}
+        for b in blocks:
+            by_page.setdefault(b["page"], []).append(b)
         for ctx in page_ctx:
             n = ctx["n"]; a = ctx.get("a", {})
-            ptxt = ctx["pdf_page"].get_text("text") if ctx.get("pdf_page") is not None else ""
+            if len(page_ctx) > 1:
+                prog.set("VERIFY", "running", f"page {n}{of}")
+            ptxt = ""
+            if kind == "pdf" and ctx["route"] != "error":
+                try:
+                    ptxt = src[n - 1].get_text("text")
+                except Exception:
+                    ptxt = ""
             info = dict(width=ctx["W"] * Z, height=ctx["H"] * Z, norm_text=re.sub(r"[^a-z0-9]+", "", ptxt.lower()),
                         text_quality=a.get("text_quality", 1.0) if ctx["route"] == "digital" else textlayer.text_quality(a.get("hidden_text", ""))[0],
                         hidden_text_raw=a.get("hidden_text", "") if ctx["route"] == "ocr" else "",
                         hidden_text_norm=re.sub(r"[^a-z0-9]+", "", (a.get("hidden_text", "") if ctx["route"] == "ocr" else "").lower()), ocr_ok=ocr_ok)
-            img = ctx.get("img")
-            crop = (lambda bb, im=img: im.crop(tuple(int(v) for v in bb))) if img is not None else (lambda bb: None)
-            for b in [x for x in blocks if x["page"] == n]:
+            crop = _lazy_crop(ctx, kind, src, out_dir)
+            for b in by_page.get(n, []):
                 verifier.verify(b, info, crop)
         flagged = sum(1 for b in blocks if b["verification"] != "verified")
     prog.set("VERIFY", "done", f"{len(blocks) - flagged} verified · {flagged} flagged")
@@ -630,6 +612,7 @@ def process(path, filename, doc_id, out_dir, prog, save_images=True, include_fur
             warnings.append("Vision API not configured: visual/handwritten regions were preserved and flagged, not interpreted.")
         if not blocks:
             warnings.append("No content could be extracted from this document.")
+        pages = []
         for ctx in page_ctx:
             pg = dict(n=ctx["n"], kind=_kind_label(ctx), width=round(ctx["W"] * Z), height=round(ctx["H"] * Z),
                       flags=ctx.get("flags", {}), chars=ctx.get("a", {}).get("chars", 0), image_coverage=ctx.get("a", {}).get("image_coverage", 0),
@@ -654,6 +637,103 @@ def process(path, filename, doc_id, out_dir, prog, save_images=True, include_fur
     if kind == "pdf":
         src.close()
     return doc
+
+
+def _analyze_one(i, kind, src, ocr_ok, warnings):
+    n = i + 1
+    ctx = dict(n=n, pdf_page=None, img=None, items=[], route=None, reason="", per_page_s=0.0)
+    t0 = time.perf_counter()
+    try:
+        if kind == "pdf":
+            p = src[i]; ctx["pdf_page"] = p
+            a = analyze_page(p)
+            route, reason = route_page(a, ocr_ok)
+            W, H = p.rect.width, p.rect.height
+        else:
+            a = dict(segs=[], chars=0, invisible=0, image_coverage=1.0, text_quality=0.0, quality_detail={}, img_zoom=0, hidden_text="",
+                     W=src.width / Z, H=src.height / Z)
+            route, reason = ("ocr" if ocr_ok else "unreadable"), "image file"
+            W, H = a["W"], a["H"]
+        ctx.update(a=a, route=route, reason=reason, W=W, H=H)
+        if route in ("digital", "embedded_ocr"):
+            _analyze_digital(ctx, a["segs"] if route == "digital" else _hidden_segments(ctx["pdf_page"]), warnings)
+        ctx["per_page_s"] += time.perf_counter() - t0
+    except Exception as e:
+        ctx.update(route="error", reason=f"analysis failed ({type(e).__name__})", W=ctx.get("W", 612), H=ctx.get("H", 792), a=dict(chars=0, image_coverage=0, text_quality=0))
+        warnings.append(f"Page {n}: analysis failed ({type(e).__name__}); page preserved.")
+    return ctx
+
+
+def _extract_one(ctx, kind, src, out_dir, save_images, warnings, state):
+    t0 = time.perf_counter()
+    n = ctx["n"]
+    # save_images: True saves every page bitmap; "needed" saves only the bitmaps extraction renders anyway (scans,
+    # figures) and leaves the rest to be rendered on demand by the viewer; False saves none.
+    need_img = save_images is True or ctx["route"] in ("ocr",) or any(it["kind"] in ("figure",) for it in ctx["items"])
+    ctx["had_img"] = need_img
+    if need_img and ctx["route"] != "error":
+        ctx["img"] = _render(ctx, kind, src)
+        if save_images:
+            ctx["img"].save(os.path.join(out_dir, f"page_{n}.png"), compress_level=1)
+    try:
+        if ctx["route"] == "ocr":
+            _extract_ocr(ctx, warnings, state)
+        elif ctx["route"] == "unreadable":
+            warnings.append(f"Page {n}: OCR engine unavailable; scanned content cannot be read.")
+            ctx["items"].append(dict(kind="figure", bbox=(0, 0, ctx["W"], ctx["H"]), hint="unknown"))
+        out = _blocks_for_page(ctx, state)
+    except Exception as ex:
+        b = make_block("", "unknown", n, scale((0, 0, ctx["W"], ctx["H"])), 0.0, "heuristic (estimated)", "fallback", None, preserved_image=True)
+        b["warnings"].append(f"Extractor error ({type(ex).__name__}) — page preserved, flagged.")
+        out = [b]
+    ctx["per_page_s"] += time.perf_counter() - t0
+    return out
+
+
+def _release(ctx, kind):
+    """Drop what a finished page no longer needs: glyph segments, layout items, the page object and its bitmap.
+    VERIFY and the viewer get the page image again on demand."""
+    a = ctx.get("a")
+    if isinstance(a, dict):
+        a.pop("segs", None)
+    ctx["items"] = []
+    ctx["pdf_page"] = None
+    if kind == "pdf":
+        ctx["img"] = None
+    for k in ("hrules", "text_segs", "vocab", "hybrid"):
+        ctx.pop(k, None)
+
+
+def _lazy_crop(ctx, kind, src, out_dir):
+    """crop(bbox) for the verifier: the page bitmap is loaded (saved PNG, else a fresh render) only if a check needs it."""
+    cache = {}
+
+    def get():
+        if "img" not in cache:
+            im = ctx.get("img")
+            if im is None and ctx.get("had_img"):    # only pages that had a bitmap during extraction get one here
+                fp = os.path.join(out_dir, f"page_{ctx['n']}.png")
+                try:
+                    if os.path.exists(fp):
+                        im = Image.open(fp); im.load()
+                    elif kind == "pdf" and ctx["route"] != "error":
+                        im = render_page(src, ctx["n"])
+                except Exception:
+                    im = None
+            cache["img"] = im
+        return cache["img"]
+
+    def crop(bb):
+        im = get()
+        return im.crop(tuple(int(v) for v in bb)) if im is not None else None
+    return crop
+
+
+def render_page(src, n, zoom=None):
+    """Page n (1-based) of an open PDF as an RGB image at the viewer scale Z (or `zoom`)."""
+    z = Z if zoom is None else zoom
+    pix = src[n - 1].get_pixmap(matrix=pymupdf.Matrix(z, z), alpha=False)
+    return Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
 
 def _kind_label(ctx):
@@ -863,9 +943,12 @@ def _blocks_for_page(ctx, state):
         ro += 1
         if isinstance(it, layout.Para):
             typ, lvl = layout.classify(it, body, hsizes, bsizes)
-            vlines, raw_lines, has_math, _ = para_text(it, hr, use_math=not any(isinstance(l, OcrLine) for l in it.lines))
+            is_code = typ == "code" or layout.is_code_lines([l.text for l in it.lines])
+            vlines, raw_lines, has_math, _ = para_text(it, hr, use_math=not is_code and not any(isinstance(l, OcrLine) for l in it.lines))
             if vlines is None:
                 vlines = raw_lines
+            if getattr(it, "code", False) and not any(isinstance(l, OcrLine) for l in it.lines):
+                vlines = layout.code_text(it).split("\n")
             if typ in ("list", "code"):
                 text = "\n".join(vlines); tr = []
             else:

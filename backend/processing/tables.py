@@ -245,7 +245,7 @@ def detect_aligned(segs, hrules, body_size, page_w, exclude=()):
         # trim single-fragment rows at the bottom
         while len(block) > 1 and len(block[-1].frags) < 2:
             block.pop()
-        tb = _build_aligned(block, hrules, body_size) if multi >= 3 and len(block) >= 3 else None
+        tb = _build_aligned(block, hrules, body_size) if multi >= 3 and len(block) >= 3 and not _listing(block) else None
         if tb:
             tables.append(tb)
             for r in block:
@@ -255,6 +255,29 @@ def detect_aligned(segs, hrules, body_size, page_w, exclude=()):
         else:
             i += 1
     return tables, used
+
+
+def _listing(block):
+    """Numbered lines laid out in one or more columns (an algorithm, a numbered list, pseudo-code) align like a table
+    but are not one: most rows carry a bare enumerator fragment ('12.') and the numbers run consecutively, or the
+    row text is code. Such blocks are left to the text/list/code path."""
+    from .layout import ENUM_ONLY, code_score
+    rows = [r for r in block if r.frags]
+    if len(rows) < 3:
+        return False
+    nums, enum_rows = [], 0
+    for r in rows:
+        e = [f for f in r.frags if ENUM_ONLY.match(f[2])]
+        if e:
+            enum_rows += 1
+            nums.append(int(re.sub(r"\D", "", e[0][2]) or 0))
+    if enum_rows >= 0.6 * len(rows):
+        steps = sum(1 for a, b in zip(nums, nums[1:]) if b == a + 1)
+        if steps >= 0.6 * max(1, len(nums) - 1):
+            return True
+    texts = [f[2] for r in rows for f in r.frags if not ENUM_ONLY.match(f[2])]
+    code = sum(1 for t in texts if code_score(t) >= 0.45)
+    return len(texts) >= 4 and code >= 0.6 * len(texts)
 
 
 def _proselike(row, body):
