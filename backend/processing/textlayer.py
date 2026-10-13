@@ -123,6 +123,8 @@ _ZERO_WIDTH = {"\u200b", "\u200c", "\u200d", "\u2060", "\ufeff", "\u200e", "\u20
 def _clean_char(c):
     if c in _ZERO_WIDTH:
         return ""
+    if c and 0xD800 <= ord(c[0]) <= 0xDFFF:      # lone surrogate from a broken font map: not valid text
+        return "\ufffd"
     if c in _LIG:
         return _LIG[c]
     if c in (" ", " ", " ", " ", " ", " ", " "):

@@ -135,7 +135,7 @@ def run_current(bench_dir, cand_dir, need, workers, timeout, annotate):
             with open(f"{base}_pg{pg}_repeat1.md", "w", encoding="utf-8") as f:
                 f.write(pm.get(pg, pm.get(str(pg), "")) if res.get("ok") else "")
         rec[rel] = dict(ok=res.get("ok"), seconds=res.get("seconds"), pages=res.get("pages"), error=res.get("error"), timeout=res.get("timeout", False),
-                        routes=res.get("routes"), page_seconds=res.get("page_seconds"))
+                        routes=res.get("routes"), page_seconds=res.get("page_seconds"), max_rss_mb=res.get("max_rss_mb"))
         sys.stderr.write(f"{'ok ' if res.get('ok') else 'ERR'} {res.get('seconds', 0):6.2f}s {rel}\n")
 
     t0 = time.perf_counter()
@@ -247,7 +247,8 @@ def main():
     total_pages = sum((r.get("pages") or 0) for r in rec.values() if r.get("ok"))
     latency = dict(per_page_median=pct(per_page, .5), per_page_p90=pct(per_page, .9), per_page_p95=pct(per_page, .95),
                    per_page_max=max(per_page) if per_page else None, per_page_mean=statistics.mean(per_page) if per_page else None,
-                   documents=len(rec), pages=total_pages, wall_seconds=round(wall, 2), workers=a.workers,
+                   documents=len(rec), pages=total_pages,
+                   worker_peak_rss_mb=max((r.get("max_rss_mb") or 0 for r in rec.values()), default=None), wall_seconds=round(wall, 2), workers=a.workers,
                    throughput_pages_per_s=round(total_pages / wall, 3) if wall else None,
                    method="time inside each worker around the conversion call (excludes process spawn and imports); "
                           "each document runs in a fresh process (cold caches); outputs written after timing")

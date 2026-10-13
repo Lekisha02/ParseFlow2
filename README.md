@@ -1,721 +1,313 @@
 # ParseFlow
 
-**ParseFlow** is a document processing system developed by **Team DEADLOCK** for the **DQCL ParseAnything** problem statement.
+**ParseFlow** is a document processing system developed by **Team DEADLOCK** for the **DQCL ParseAnything** problem statement (DataQuest 3.0).
 
-The main idea of the project is to process different types of content present inside a document and extract them into a structured format.
+It reads PDFs and images that mix digital text, tables, scans, handwriting, equations, diagrams and charts, uses the right extractor for each region, and returns a structured **Digital Twin** (JSON) plus **canonical Markdown**, keeping the evidence behind every result: page, bounding box, extractor, confidence, verification status and warnings.
 
-A document may contain normal digital text, tables, scanned pages, handwritten content, diagrams, equations, charts, etc. Instead of using the same technique for everything, ParseFlow identifies the type of content and uses a suitable method for extracting it.
+> **Version 2** (this revision) rebuilt the extraction core for accuracy and speed while keeping the architecture, API and frontend: column-aware layout, running header/footer detection, table structure with merged cells, LaTeX from the PDF text layer, adaptive OCR preprocessing, backend Markdown, a stricter evidence-based verifier, a one-command CLI, a pytest suite and an official olmOCR-Bench harness. See [CHANGES.md](CHANGES.md) and [Benchmark results](#benchmark-results).
 
 ---
 
 ## Problem Statement
 
-Most document extraction systems work well when the document contains normal digital text, but real-world documents are often more complicated.
-
-For example, a single PDF may contain:
-
-- Digital text
-- Tables
-- Scanned pages
-- Handwritten notes
-- Handwritten code
-- Mathematical equations
-- Diagrams
-- Charts
-- Images
-
-Using only one extraction technique for all these cases can result in missing or incorrect information.
-
-Another problem is that when an AI model is used for extraction, it may sometimes generate information that is not actually present in the document.
-
-Our project tries to solve these problems by using different processing methods depending on the type of content and by keeping track of where the extracted information came from.
+Most extraction systems work on clean digital text, but real documents mix digital text, tables, scanned pages, handwriting, handwritten code, equations, diagrams, charts and images. One technique for everything loses or invents information, and AI models can produce content that is not in the document. ParseFlow processes each kind of content with a suitable method and records where every result came from.
 
 ---
 
-# Our Approach
-
-The complete processing flow is:
+## Our Approach
 
 ```text
-Document
-   ↓
-Detect
-   ↓
-Analyze
-   ↓
-Route
-   ↓
-Extract
-   ↓
-Assemble
-   ↓
-Verify
-   ↓
-Structured Output
+Document → Detect → Analyze → Route → Extract → Assemble → Verify → Structured Output (JSON + Markdown)
 ```
 
-Each stage has a specific purpose.
+| Stage | What happens (v2) |
+|---|---|
+| **Detect** | File type, page count, encryption, size limits. Per page (no rendering): visible text amount, hidden OCR text layer, image coverage, **text-layer quality** (broken font maps and garbage OCR layers are detected). |
+| **Analyze** | Character-level reading of the text layer (font, size, baseline, bbox for every glyph); display equations; ruled and borderless tables; figures; drop caps; split accents. Scanned pages: adaptive OCR. |
+| **Route** | Per page and per region, cheapest suitable method first (table below). |
+| **Extract** | Paragraphs, headings, lists, code, captions, tables (cell model), equations (LaTeX), figures (vision or flagged). |
+| **Assemble** | Column-aware reading order, **document-level header/footer/page-number classification**, block ids, caption links. |
+| **Verify** | Evidence-based status per block (independence rules below). |
+| **Output** | Digital Twin JSON (backward compatible, additive fields) + canonical Markdown generated in the backend. |
 
-### 1. Detect
-
-The system first checks the uploaded document and identifies basic information such as:
-
-- File type
-- Number of pages
-- File size
-- Whether the PDF contains a digital text layer
-- Whether the document is scanned
-
-Currently, the system accepts PDF, PNG, JPG and JPEG files.
-
----
-
-### 2. Analyze
-
-After detecting the document, each page is analyzed to identify different regions.
-
-For example, a page can contain:
-
-```text
-Heading
-Paragraph
-Table
-Figure
-Caption
-```
-
-The system keeps these regions separately instead of treating the entire page as one block.
-
-For digital PDFs, this is mainly handled using **PyMuPDF**.
-
----
-
-### 3. Route
-
-Once the regions are identified, ParseFlow decides which extraction method should be used.
+### Routing
 
 | Content | Method |
 |---|---|
-| Digital text | PDF text extraction |
-| Tables | Local table extraction |
-| Scanned text | Tesseract OCR |
-| Handwriting | Vision model |
-| Handwritten code | Vision model |
-| Equations | Vision model |
-| Diagrams | Vision model |
-| Charts | Vision model |
-| Figures | Vision model |
+| Digital text (trustworthy text layer) | Native text layer (PyMuPDF), column-aware layout |
+| Text layer present but broken (unmapped glyphs, implausible words) | Adaptive OCR; the text layer is kept as evidence |
+| Scanned page with an embedded OCR layer | Embedded layer when plausible, otherwise Tesseract |
+| Scanned page | Adaptive preprocessing + Tesseract |
+| Photo/graphic page with a few real text lines | **Hybrid**: native lines kept, OCR for the rest |
+| Ruled tables | Vector ruling grid → cells with rowspan/colspan |
+| Borderless / booktabs tables | Column alignment + horizontal rules for header blocks |
+| Equations (digital) | LaTeX rebuilt from glyph geometry (no model) |
+| Equations (scanned) | Optional local recognizer; otherwise OCR text kept and flagged |
+| Handwriting, diagrams, charts, figures | Vision model when configured; otherwise preserved and flagged |
 
-This is one of the main ideas of the project.
-
-We don't send the complete document to an AI model unnecessarily. We use local processing wherever possible and use vision models only for regions that require them.
-
----
-
-# Extraction Methods
-
-## Digital Text
-
-For normal digital PDFs, we use **PyMuPDF** to extract the existing text layer.
-
-The parser also uses the position of text blocks to reconstruct the reading order.
-
-This is useful for documents with layouts such as:
-
-```text
-┌───────────────┬───────────────┐
-│   Column 1    │   Column 2    │
-│               │               │
-│   Text        │   Text        │
-│   Text        │   Text        │
-└───────────────┴───────────────┘
-```
-
-The system tries to preserve the logical order instead of simply reading the PDF's raw text sequence.
+Vision models are optional and never required. Everything else runs **offline without API keys**.
 
 ---
 
-## Tables
+## What is extracted and how
 
-Tables present in digital PDFs are processed locally.
+### Digital text and reading order
+Glyphs are read with their font, size and baseline. Lines are split at wide gaps; spaces are synthesised adaptively when a PDF positions words without space glyphs; ligatures are expanded; accents drawn as separate glyphs are composed (`a` + `´` → `á`); drop caps are re-attached.
+Reading order uses a recursive XY-cut that prefers real text gutters, treats full-width elements (titles, running headers) as separators, and handles sidebars next to text columns. Hyphenated line breaks are rejoined only with evidence (the joined word occurs in the document, or the prefix is not a compound-forming prefix such as `self-`, `well-`, `non-`).
 
-The system identifies table regions and extracts their rows and columns.
+### Running headers, footers and page numbers
+A document-level classifier scores each edge-of-page line with independent signals and keeps the reasons: position (top/bottom band, extreme edge, rotated side-margin stamps), isolation from the body, **repetition across pages** (digits normalised), page-number patterns (`12`, `- 12 -`, `xii`, `Page 3 of 20`), publication boilerplate (URLs, DOI, ©, "Downloaded from", journal/volume/issue, revision/part numbers, dates), small font, rows of short items spread across the line, items sharing a line with a page number, and content that ends far from the paper edge. Protective signals keep one-off titles, footnotes, captions and section headings. A structural signal (isolation, repetition, page number, margin, edge row) is required before anything is removed; a fixed margin alone never removes text.
+Removed items stay in the JSON (`role`, `furniture.score`, `furniture.reasons`, `furniture.excluded`). Removal is configurable (`PARSEFLOW_REMOVE_FURNITURE=0`, CLI `--include-headers`, API `?include_furniture=1`, frontend toggle).
 
-The extracted table is then stored as a structured block instead of plain text.
+### Tables
+* **Ruled tables**: PyMuPDF `find_tables()` runs only inside regions where vector rules form a grid; cell geometry is mapped onto row/column edges so merged cells get real `rowspan`/`colspan`.
+* **Borderless/booktabs tables**: consecutive rows that split into aligned fragments; columns from x-coverage, plus whitespace "rivers" (e.g. a `#` column next to a text column); rejection of multi-column prose (long fragments, high row coverage, misaligned cell edges) and leader dots; category rows inside tables are allowed.
+* **Header blocks** above a table (e.g. *Year Ended* over date columns, rotated 45° column labels, group labels such as *ReACT*) are attached by column alignment; a rule under a header cell defines its span.
+* Currency-only columns are folded into their values (`$178`), nothing is dropped.
+* Output: Markdown for rectangular tables with one header row, **HTML with `<th>`, `rowspan`, `colspan`** otherwise. Pipes are escaped, in-cell line breaks normalised, empty cells kept empty (`filled: false`). Values are never invented.
 
-For example:
+### Equations
+On digital PDFs the LaTeX is rebuilt from the text layer: Unicode→LaTeX symbol table (Greek, operators, relations, arrows, ℝ/ℕ, math alphanumerics), TeX font families (`\mathbb`, `\mathcal`, `\mathfrak`, `\mathbf`), sub/superscripts from baseline offsets and sizes, fractions from vector rules, big operators with limits, radicals with overbars, `\operatorname` for upright function names, multi-line displays split into separate equations, equation numbers separated. Display math is emitted as `\[ … \]`, inline math as `\( … \)` (token-level detection: italic words, footnote markers and Greek-language words are not wrapped). Glyphs without a Unicode mapping lower the confidence and are reported instead of guessed. Reconstructed structure is marked `review`, never `verified`. Original glyph text is kept in `raw_text`.
 
-```text
-Region    FY23    FY24
------------------------
-Americas  18.0    19.1
-Europe    11.2    11.2
-APAC      14.4    17.9
-```
+### OCR for scans (`processing/ocr.py`)
+1. **Measure**: contrast (ink vs background), background unevenness, speckle (full resolution), skew (projection profile, applied only when the estimate is clearly better than 0°), character height.
+2. **Apply only what the measurements call for**: illumination normalisation, contrast stretch, median despeckle, deskew, upscaling of small print, Sauvola binarisation.
+3. **Bounded fallback**: if the result is weak, one alternative representation (the conservative "minimal" image if risky steps were used); never more than 2 attempts by default; OSD rotation only on request.
+4. Pages are rendered at the scan's native resolution (bounded), never upsampled needlessly. Results are cached by image hash. Noise lines from textures/photos are filtered; handwriting-only pages keep isolated words, flagged.
 
----
-
-## OCR
-
-For scanned documents, there may be no digital text layer.
-
-In this case ParseFlow uses **Tesseract OCR**.
-
-OCR provides:
-
-- Extracted words
-- Word coordinates
-- OCR confidence
-- Line information
-
-The coordinates are important because they allow the extracted text to be connected to its original location on the page.
+### Verification (stricter than v1)
+* `verified` requires **independent evidence**, or content read directly from the document's encoded text layer (no recognition step) with passing quality checks — that basis is recorded as *document-encoded*, not as independent.
+* Outputs derived from the same extraction never count as independent (table cells are not "verified" by the text layer they were read from; two Tesseract passes are not independent).
+* OCR alone is `review`; it becomes `verified` when an independent recogniser (the PDF's embedded OCR layer) agrees. Model output is `review` unless independently confirmed (e.g. table cells found in the text layer, OCR token overlap).
+* Ruled tables are `verified` (grid geometry is independent of the text); borderless tables are `review` (structure inferred).
+* Every block carries `evidence` (short string, v1-compatible) and `evidence_detail` (`basis`, `independent`, `signals`, `confidence_method`), plus `raw_text` and `transforms` whenever normalisation/reconstruction was applied. Statuses: `verified`, `review` (uncertain), `failed`.
 
 ---
 
-## Handwriting and Visual Content
+## Digital Twin (JSON)
 
-Some content cannot be reliably extracted using normal PDF parsing or OCR.
-
-Examples include:
-
-- Handwritten notes
-- Handwritten programs
-- Equations
-- Diagrams
-- Charts
-- Figures
-
-For these cases, ParseFlow can use a vision model.
-
-The project currently supports:
-
-- Google Gemini
-- Anthropic Claude
-
-The vision model is given the relevant region rather than unnecessarily processing the complete document.
-
----
-
-# Digital Twin
-
-After extraction, ParseFlow converts the different regions into a common structured format.
-
-We refer to this as the **Digital Twin** of the document.
-
-Each block contains information such as:
+All v1 fields are unchanged. Example block:
 
 ```json
 {
-  "block_id": "txt_1_01",
-  "type": "paragraph",
-  "content": "Example text",
-  "page": 1,
-  "bbox": [40, 95, 560, 175],
-  "reading_order": 2,
-  "confidence": 0.99,
-  "extractor": "digital_text_parser",
-  "verification": "verified"
+  "block_id": "eq_1_01", "type": "equation", "content": "λg = ∑ s∈S ζ ψ(gs) n", "page": 1,
+  "bbox": [412, 288, 794, 364], "reading_order": 2, "confidence": 0.8,
+  "confidence_type": "heuristic (estimated)", "extractor": "digital_text_parser", "verification": "review",
+  "relationships": [], "warnings": [],
+  "latex": "\\lambda_{g} = \\sum_{s \\in S} \\zeta_{n}^{\\psi ( gs )}", "math_display": true, "reconstructed": true,
+  "raw_text": "λg = ∑ s∈S ζ ψ(gs) n", "transforms": ["big operator limits reconstructed", "script placement from baseline offsets"],
+  "evidence": "text-layer quality 1.00; LaTeX structure reconstructed from glyph geometry (inferred, not encoded)",
+  "evidence_detail": {"basis": "document-encoded text layer (no recognition step)", "independent": false, "signals": ["…"], "confidence_method": "text-layer quality checks"}
 }
 ```
 
-This means we don't just store the extracted text.
-
-We also store:
-
-- What the content is
-- Where it is located
-- Which page it belongs to
-- Its position on the page
-- Reading order
-- Which extractor was used
-- Confidence
-- Verification status
-- Warnings
-- Relationships with other blocks
-
-This makes it possible to go back from the extracted result to the original document.
+Additive document fields: `markdown`, `schema_version: 2`, `timings` (per stage, seconds), `pages[].route`, `pages[].route_reason`, `pages[].text_quality`, `pages[].ocr` (preprocessing steps, attempts, metrics), `pages[].seconds`, `stats.furniture_excluded`, `engines.math_recognizer`, `config`. Table blocks add `cells` (row, col, rowspan, colspan, text, bbox, header, filled), `header_rows`, `table_method`, `markdown`.
 
 ---
 
-# Verification
+## Installation
 
-One of the important parts of ParseFlow is the verification step.
+Requirements: Python ≥ 3.10, the Tesseract binary (for scans), Linux or macOS (Windows works via `run.bat`).
 
-The system does not consider an AI model's confidence score to be enough by itself.
+```bash
+# system OCR engine
+sudo apt install tesseract-ocr        # Debian/Ubuntu
+brew install tesseract                # macOS
 
-Depending on the type of content, the system tries to use additional evidence.
-
-For example:
-
-### Digital Text
-
-The extracted content can be compared with the original PDF text layer.
-
-### Tables
-
-Extracted table values can be checked against text available in the source document.
-
-### OCR
-
-OCR confidence is retained with the extracted result.
-
-### Vision
-
-Vision-model results may remain in a review state when there is no independent evidence available.
-
----
-
-## Confidence Levels
-
-The current verification system uses the following general thresholds:
-
-```text
-Confidence >= 0.85
-        ↓
-    VERIFIED
-
-0.60 - 0.84
-        ↓
-     REVIEW
-
-Confidence < 0.60
-        ↓
-     FAILED
+git clone https://github.com/ADII6769/PARSERFLOWS.git
+cd PARSERFLOWS
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt               # app + CLI
+pip install -r requirements-dev.txt           # tests and benchmark tooling (optional)
 ```
 
-The exact verification result also depends on whether independent evidence is available.
+Or install as a package (provides the `parseflow` command): `pip install -e ".[server]"`.
 
----
-
-# What happens when the system is not sure?
-
-We decided that it is better to flag an uncertain result than to generate something that looks correct but was never actually present in the document.
-
-For example:
-
-```text
-Content:
-[Not confidently extracted]
-
-Status:
-Review
-
-Warning:
-Low confidence
+### Web app
+```bash
+bash run.sh          # Linux/macOS  (run.bat on Windows)  → http://localhost:8000
 ```
 
-The original page region is still preserved so that the user can manually check it.
-
-This is especially useful for handwritten content and complicated diagrams.
-
----
-
-# Frontend
-
-The frontend is implemented in a single `index.html` file and communicates with the FastAPI backend.
-
-The interface provides:
-
-### Upload
-
-Users can upload a document using the browser.
-
-### Processing Status
-
-The interface displays the current processing stage:
-
-```text
-DETECT
-ANALYZE
-ROUTE
-EXTRACT
-ASSEMBLE
-VERIFY
-OUTPUT
+### One-command CLI (offline, no API keys)
+```bash
+./parseflow input_pdfs/ --output-dir output_markdown/
+# or, after `pip install -e .`:
+parseflow input_pdfs/ --output-dir output_markdown/
 ```
+| Option | Meaning |
+|---|---|
+| `-r/--recursive` | search folders recursively (sub-folders are mirrored, so names never collide) |
+| `-w/--workers N` | parallel worker processes (default min(4, CPUs)) |
+| `-t/--timeout S` | per-document timeout (the worker is killed, the batch continues) |
+| `--json` | also write the Digital Twin `<name>.json` |
+| `--report r.json` | machine-readable summary of every file |
+| `--log-json` | one JSON line per finished document on stdout |
+| `--include-headers` | keep running headers/footers/page numbers |
+| `--plain` | no HTML-comment warnings in the Markdown |
+| `--skip-existing`, `--images` | skip done files; also convert PNG/JPG |
 
-### Document Viewer
+Each document runs in its own process (a malformed PDF cannot take the batch down); successful outputs are written atomically and kept when other files fail; the exit code is `1` if any file failed, `0` otherwise, `2` for usage errors.
 
-Users can view the original pages along with the detected regions.
-
-### Block Inspector
-
-Selecting a region shows information such as:
-
-- Content
-- Block type
-- Confidence
-- Extractor
-- Page
-- Bounding box
-- Verification status
-- Warnings
-
-### JSON View
-
-The complete Digital Twin can be viewed as JSON.
-
-### Markdown View
-
-The extracted document can also be viewed in Markdown form.
-
-### Tables / Visuals / Handwritten
-
-The interface provides separate views for different types of extracted content.
-
----
-
-# System Architecture
-
-```text
-                     User
-                      │
-                      ▼
-                Web Interface
-                      │
-                      ▼
-                   FastAPI
-                      │
-                      ▼
-                  Pipeline
-                      │
-          ┌───────────┼───────────┐
-          │           │           │
-          ▼           ▼           ▼
-      PDF Parser     OCR       Vision
-      PyMuPDF     Tesseract   Gemini /
-                               Claude
-          │           │           │
-          └───────────┼───────────┘
-                      ▼
-                   Assemble
-                      │
-                      ▼
-                   Verify
-                      │
-                      ▼
-                 Digital Twin
-                      │
-                      ▼
-                  Frontend
+### Python
+```python
+import sys; sys.path.insert(0, "backend")
+from processing.runner import convert
+doc = convert("paper.pdf")          # Digital Twin dict
+print(doc["markdown"])
 ```
 
 ---
 
-# Project Structure
+## API (FastAPI)
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/health` | backend status, OCR engine, vision config, math recognizer, PyMuPDF version, limits |
+| `POST /api/process` | upload (PDF/PNG/JPG; type checked before storing; size limit `MAX_UPLOAD_MB`); returns `document_id, filename, size, type, pages` |
+| `GET /api/status/{id}` | `status`, `stages`, `error`, **`timings`** |
+| `GET /api/document/{id}` | Digital Twin JSON (now includes `markdown`) |
+| `GET /api/document/{id}/markdown` | **new**: canonical Markdown; `?include_furniture=1` restores headers/footers, `?annotate=0` drops HTML-comment warnings |
+| `GET /api/page/{id}/{n}.png` | rendered page image for the viewer |
+
+Uploads that fail validation are deleted immediately; processed documents expire after `PARSEFLOW_JOB_TTL_HOURS` (default 24). The frontend renders the backend Markdown (with an *include running headers/footers* toggle) and keeps its own `md()` only for demo/browser mode.
+
+---
+
+## Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VISION_PROVIDER`, `VISION_API_KEY`, `VISION_MODEL`, `MAX_VISION_REGIONS` | gemini, –, provider default, 12 | optional vision model (never required) |
+| `MAX_PAGES` | 60 | page limit per document |
+| `MAX_UPLOAD_MB` | 50 | API upload limit |
+| `OCR_LANG` | eng | Tesseract language(s), e.g. `eng+deu` |
+| `OCR_TIMEOUT` | 60 | seconds per Tesseract call |
+| `OCR_MAX_ATTEMPTS` | 2 | bounded OCR fallback attempts (3 enables OSD rotation) |
+| `OCR_MAX_ZOOM`, `OCR_MAX_SIDE_PX` | 4.17, 4200 | render-resolution bounds for scans |
+| `MAX_REGION_OCR` | 6 | OCR of picture regions on digital pages (per document) |
+| `PARSEFLOW_REMOVE_FURNITURE` | 1 | exclude confidently detected headers/footers from Markdown |
+| `PARSEFLOW_MATH_RECOGNIZER` | none | `none` · `pix2tex` · `rapid_latex_ocr` · `command` (scanned equations) |
+| `PARSEFLOW_MATH_MODEL_DIR`, `PARSEFLOW_MATH_CMD` | – | local weights folder / external recognizer command |
+| `PARSEFLOW_DATA_DIR`, `PARSEFLOW_JOB_TTL_HOURS`, `PARSEFLOW_WORKERS` | data/, 24, 2 | API storage, expiry, concurrency |
+
+### Formula recognition for scanned equations (optional)
+Digital PDFs need no model. For equations in **scans**, a recognizer can be plugged in; it runs only on detected equation regions and **never downloads weights at runtime** (missing weights are reported via `/api/health` and block warnings):
+
+* `pix2tex` (LaTeX-OCR, MIT): `pip install "pix2tex[cli]"` (needs PyTorch; CPU works, roughly seconds per equation). Put `weights.pth` and `image_resizer.pth` from the project's GitHub release into `PARSEFLOW_MATH_MODEL_DIR`.
+* `rapid_latex_ocr` (Apache-2.0, ONNX Runtime only): `pip install rapid_latex_ocr`; put `encoder.onnx`, `decoder.onnx`, `image_resizer.onnx`, `tokenizer.json` into `PARSEFLOW_MATH_MODEL_DIR`.
+* `command`: any local executable that takes an image path and prints LaTeX (`PARSEFLOW_MATH_CMD`).
+
+These adapters could not be exercised here (no PyPI/model access in the build environment); only the `command` plugin and the "weights missing" path are covered by tests. Evaluate a model on old-scans math before relying on it.
+
+---
+
+## Tests
+
+```bash
+pytest -q                                   # 67 unit/integration tests, generated fixtures, ~1 min
+OLMOCR_PATH=/path/to/olmocr pytest -m bench # regression on the official sample with the official test classes
+```
+Covered: native text, scanned OCR (skew, noise, blur, low contrast, uneven light, small text; preprocessing never worse than plain OCR), two-column and sidebar reading order, header/footer classification (repeated headers, page numbers, first-page title, footnotes, section headings, documents without headers, configurability), equation boundaries/LaTeX/symbols/fallback, ruled tables with merged cells, borderless tables, prose rejection, Markdown escaping, hyphenation, Unicode/accents, empty/corrupt/encrypted/multi-page/image inputs, OCR timeout fallback, verifier independence/provenance, JSON and Markdown API responses, upload validation and cleanup, CLI batch/timeout, determinism. Failures name the PDF, page, test id and the scorer's explanation.
+
+---
+
+## Benchmark (official olmOCR-Bench scorer)
+
+`bench/run_olmocr_bench.py` converts every PDF, writes `<candidate>/<pdf>_pg{page}_repeat1.md`, then runs the **unmodified official CLI** and records scores, latency (median/p90/p95/max, throughput), errors, timeouts, hardware and configuration as JSON + Markdown. Failed or timed-out documents get an empty Markdown file, so their tests fail; nothing is skipped.
+
+```bash
+git clone https://github.com/allenai/olmocr.git          # scorer (we used commit f7cfe4c)
+pip install fuzzysearch rapidfuzz tqdm beautifulsoup4 pypdf playwright && playwright install chromium
+
+# full benchmark: 1,403 PDFs from Hugging Face
+huggingface-cli download --repo-type dataset --resume-download allenai/olmOCR-bench --local-dir ./olmOCR-bench
+python bench/run_olmocr_bench.py --bench-dir olmOCR-bench/bench_data --olmocr olmocr --results bench/results/full.json
+
+# fixed regression sample: N PDFs per category, deterministic by hash (manifest saved)
+python bench/run_olmocr_bench.py --bench-dir olmOCR-bench/bench_data --sample-per-category 25 --seed 0 --olmocr olmocr
+
+# original v1 implementation under identical conditions
+python bench/run_olmocr_bench.py --bench-dir … --impl legacy --legacy-backend /path/to/v1/backend --legacy-md plain
+
+# regression gate (CI): fail if a protected category drops by more than 1 point
+python bench/compare.py --baseline bench/baselines/sample_v2.json --current bench/results/parseflow.json --tolerance 1.0 --protected dataset.jsonl,type:math,type:table,type:absent
+```
+The scorer command that is run is exactly: `python -m olmocr.bench.benchmark --dir <bench-dir> --candidate parseflow`.
+
+### Benchmark results
+
+**Only the official scorer's bundled sample (21 PDFs, 100 tests) could be run in the build environment**: Hugging Face (and therefore the 1,403-PDF dataset) was not reachable. The sample is also the set this version was developed against, so these are **in-sample numbers, not a held-out or full-benchmark score**. The full run has to be done with the commands above.
+
+Hardware: Intel Xeon @ 2.80 GHz, 2 logical cores, 7.8 GB RAM, Linux; PyMuPDF 1.28.2, Tesseract 5.3.4; 2 workers; vision off; no math model; Python `rapidfuzz` implementation in the scorer. Latency = time inside each worker around the conversion call (imports and process spawn excluded, cold caches, one fresh process per document), identical method for v1 and v2.
+
+| Official sample, `dataset.jsonl` (99 tests) | v1 original | v2 |
+|---|---|---|
+| **Main score** | **34.3 %** (34/99) | **83.8 %** (83/99) |
+| absent (headers/footers) | 33.3 – 37.5 | 100.0 |
+| math | 0.0 | 100.0 |
+| table | 50.0 | 100.0 |
+| order | 46.2 | 84.6 |
+| present | 30.0 – 33.3 | 53.3 |
+| baseline / blank-page checks | 100 / 0–100 | 100 / 100 |
+| median latency (s/page) | 0.50 | **0.18** |
+| p90 / p95 / max (s/page) | 1.6–1.8 / 3.3 / 11.8–12.2 | 2.2 / 2.5 / 5.5 |
+
+(v1 ranges cover the two ways of turning v1 output into Markdown: the frontend `md()` with provenance comments, and plain text. The scorer's printed "overall" averages the three JSONL groups of the sample — 44.8/78.1 vs 94.6 — and is not meaningful on this sample.) The remaining sample failures are handwriting (needs a vision model), errors already present in a scan's OCR, logo text inside an image, and one ambiguous card-layout order.
+
+**Is the score above 80 %?** On the official *sample* the main test file reaches 83.8 %, but that is in-sample and not the benchmark. A reproducible **full olmOCR-Bench score above 80 % has not been demonstrated**. For context, the olmocr README reports Marker 76.1, MinerU 75.2, DeepSeek-OCR 75.7 and Mistral OCR 72.0; the results above 80 (PaddleOCR-VL 80.0, olmOCR v0.4 82.4, Infinity-Parser 82.5, Chandra 83.1) come from neural vision-language models. The full set contains old-scan, handwriting and scanned-math material where an offline Tesseract pipeline is fundamentally limited. Run the full benchmark to get the real number.
+
+---
+
+## Project structure
 
 ```text
 PARSERFLOWS/
-│
 ├── backend/
-│   ├── app.py
-│   │
+│   ├── app.py                FastAPI app (API unchanged + markdown endpoint)
+│   ├── cli.py                batch CLI
 │   └── processing/
-│       ├── __init__.py
-│       ├── pipeline.py
-│       ├── pdf_parser.py
-│       ├── ocr.py
-│       ├── vision.py
-│       ├── verifier.py
-│       └── schema.py
-│
-├── frontend/
-│   └── index.html
-│
-├── .env.example
-├── requirements.txt
-├── run.sh
-├── run.bat
-└── README.md
-```
-
-### Main files
-
-| File | Purpose |
-|---|---|
-| `app.py` | FastAPI application and API endpoints |
-| `pipeline.py` | Controls the complete document-processing flow |
-| `pdf_parser.py` | Handles digital PDF extraction |
-| `ocr.py` | Handles OCR using Tesseract |
-| `vision.py` | Handles Gemini/Claude vision processing |
-| `verifier.py` | Handles verification of extracted content |
-| `schema.py` | Defines the structure of extracted blocks |
-| `index.html` | Frontend interface |
-| `requirements.txt` | Python dependencies |
-| `.env.example` | Environment variable configuration |
-| `run.sh` | Linux/macOS startup script |
-| `run.bat` | Windows startup script |
-
----
-
-# API
-
-The backend is implemented using FastAPI.
-
-### Health Check
-
-```http
-GET /api/health
-```
-
-Used to check whether the backend is running and whether OCR/vision components are available.
-
-### Process Document
-
-```http
-POST /api/process
-```
-
-Uploads and starts processing a document.
-
-### Processing Status
-
-```http
-GET /api/status/{document_id}
-```
-
-Returns the current processing status.
-
-### Get Processed Document
-
-```http
-GET /api/document/{document_id}
-```
-
-Returns the Digital Twin JSON.
-
-### Get Page
-
-```http
-GET /api/page/{document_id}/{page}.png
-```
-
-Returns a rendered page image for the document viewer.
-
----
-
-# Technologies Used
-
-### Backend
-
-- Python
-- FastAPI
-- Uvicorn
-
-### Document Processing
-
-- PyMuPDF
-- Pillow
-- NumPy
-- SciPy
-
-### OCR
-
-- Tesseract
-- pytesseract
-
-### AI / Vision
-
-- Google Gemini
-- Anthropic Claude
-
-### Frontend
-
-- HTML
-- CSS
-- JavaScript
-- SVG
-
----
-
-# Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/ADII6769/PARSERFLOWS.git
-cd PARSERFLOWS
-```
-
-### Windows
-
-```bat
-run.bat
-```
-
-### Linux / macOS
-
-```bash
-bash run.sh
-```
-
-After starting the server, open:
-
-```text
-http://localhost:8000
+│       ├── pipeline.py       stages, routing, assembly, timings
+│       ├── textlayer.py      glyph-level text layer, spacing, accents, quality
+│       ├── layout.py         reading order, paragraphs, headings, dehyphenation
+│       ├── headers_footers.py running header/footer/page-number classifier
+│       ├── tables.py         table detection + cell model + Markdown/HTML
+│       ├── mathtex.py        math detection + LaTeX reconstruction
+│       ├── recognizers.py    optional local formula recognizers
+│       ├── ocr.py            adaptive preprocessing + bounded OCR
+│       ├── verifier.py       evidence-based verification
+│       ├── markdown.py       canonical Markdown serializer
+│       ├── runner.py         isolated batch execution (CLI + benchmark)
+│       ├── vision.py         optional Gemini/Claude vision (unchanged)
+│       ├── schema.py         block schema helpers
+│       └── pdf_parser.py     v1 helpers (kept for compatibility, unused by v2 pipeline)
+├── frontend/index.html
+├── bench/                    official-scorer harness, v1 runner, compare, baselines
+├── tests/                    pytest suite
+├── parseflow                 CLI launcher
+├── requirements.txt, requirements-dev.txt, pyproject.toml, run.sh, run.bat, .env.example
+└── .github/workflows/ci.yml
 ```
 
 ---
 
-# Environment Variables
+## Deployment notes
 
-Vision processing is optional.
+* ParseFlow needs the **Tesseract binary** for scans and runs background jobs in a thread pool with page images on local disk. Serverless platforms (e.g. Vercel functions) typically lack the binary, cap execution time and do not keep local files between invocations; **this was not tested on any serverless platform**, so use a normal server or container there.
+* Licences: PyMuPDF/MuPDF is **AGPL-3.0** (or commercial licence from Artifex); Tesseract is Apache-2.0. Check this before distributing ParseFlow as a hosted service.
 
-Example `.env`:
+## Current limitations
 
-```env
-VISION_PROVIDER=gemini
-VISION_API_KEY=YOUR_API_KEY
-VISION_MODEL=
-MAX_VISION_REGIONS=12
-MAX_PAGES=60
-```
+* Handwriting, hand-drawn diagrams and charts need a configured vision model; offline they are preserved and flagged.
+* Scanned math is OCR text + flag unless a local recognizer is configured; inline math detection on digital PDFs is heuristic.
+* Unmapped glyphs (e.g. big delimiters in some TeX fonts) are dropped from LaTeX and flagged.
+* Borderless tables with irregular layouts or tables spanning pages may be split or merged imperfectly (marked `review`).
+* Card/grid layouts can be read column-wise where row-wise was intended.
+* OCR quality on degraded historic scans is bounded by Tesseract.
 
-For Anthropic:
+## Team
 
-```env
-VISION_PROVIDER=anthropic
-VISION_API_KEY=YOUR_API_KEY
-VISION_MODEL=
-MAX_VISION_REGIONS=12
-MAX_PAGES=60
-```
-
-If no vision API key is provided, the system can still process digital PDFs and OCR-supported scanned documents. Visual regions that cannot be processed are preserved and flagged.
-
----
-
-# Example
-
-Suppose the uploaded document contains:
-
-```text
-Page 1
- ├── Digital paragraph
- ├── Table
- └── Chart
-
-Page 2
- ├── Scanned text
- ├── Handwritten notes
- ├── Diagram
- └── Equation
-```
-
-ParseFlow handles it approximately like this:
-
-```text
-Digital paragraph
-        ↓
-   PDF Parser
-
-Table
-        ↓
- Table Extraction
-
-Chart
-        ↓
- Vision
-
-Scanned text
-        ↓
-   Tesseract
-
-Handwritten notes
-        ↓
-   Vision
-
-Diagram
-        ↓
-   Vision
-
-Equation
-        ↓
-   Vision
-```
-
-All of these are then combined into a single structured document.
-
----
-
-# Why ParseFlow?
-
-The main difference between ParseFlow and a basic document-to-text system is that ParseFlow tries to retain the **structure and evidence behind the extraction**.
-
-Instead of only producing:
-
-```text
-Extracted text...
-```
-
-the system produces something closer to:
-
-```text
-Extracted text
-│
-├── Page: 2
-├── Location: [x1, y1, x2, y2]
-├── Type: paragraph
-├── Extractor: OCR
-├── Confidence: 0.91
-└── Verification: verified
-```
-
-This makes the result easier to inspect and debug.
-
----
-
-# Current Limitations
-
-- Scanned documents require Tesseract for OCR.
-- Handwriting and complex visual content require a configured vision model for full extraction.
-- Vision-based results may require manual review.
-- Very large documents are limited by configurable page and vision-region limits.
-- Password-protected PDFs cannot be processed directly.
-
----
-
-# Future Improvements
-
-Some possible extensions are:
-
-- Better handwriting recognition
-- Better multilingual OCR
-- Improved chart extraction
-- More accurate table reconstruction
-- More advanced document search
-- Vector database support
-- Batch document processing
-- User authentication
-- Persistent document storage
-- More vision providers
-- Better evaluation and benchmarking
-
----
-
-# Team
-
-**Team DEADLOCK**
-
-**Project:** ParseFlow  
-**Problem Statement:** DQCL ParseAnything  
-**Event:** DataQuest 3.0
-
-Repository:
-
-https://github.com/ADII6769/PARSERFLOWS
-
----
+Team DEADLOCK · Project: ParseFlow · Problem Statement: DQCL ParseAnything · Event: DataQuest 3.0 · Repository: https://github.com/ADII6769/PARSERFLOWS
 
 ## In Short
 
-ParseFlow takes a complex document, identifies the different types of content inside it, chooses an appropriate extraction method for each region, combines the results into a structured Digital Twin, and keeps track of the source and verification status of the extracted information.
-
-The main idea can be summarized as:
-
-```text
-Don't treat every part of a document the same.
-Understand the content first,
-use the right extractor,
-and keep the evidence with the result.
-```
+Don't treat every part of a document the same. Understand the content first, use the right extractor, and keep the evidence with the result.

@@ -286,6 +286,7 @@ def _column_edges(block, body):
     widths = sorted(f[1] - f[0] for f in frs)
     med = widths[len(widths) // 2]
     narrow = [f for f in frs if (f[1] - f[0]) <= max(3 * med, 6 * body)] or frs
+    narrow_ids = {id(f) for f in narrow}
     iv = sorted((f[0], f[1]) for f in narrow)
     cols, cur = [], list(iv[0])
     for a, b in iv[1:]:
@@ -295,7 +296,7 @@ def _column_edges(block, body):
             cols.append(tuple(cur)); cur = [a, b]
     cols.append(tuple(cur))
     # wide fragments that overlap no column are a real (text) column, not a spanning header
-    extra = [(f[0], f[1]) for f in frs if f not in narrow and not any(min(f[1], c[1]) - max(f[0], c[0]) > 0 for c in cols)]
+    extra = [(f[0], f[1]) for f in frs if id(f) not in narrow_ids and not any(min(f[1], c[1]) - max(f[0], c[0]) > 0 for c in cols)]
     if extra:
         allc = sorted(cols + extra)
         cols, cur = [], list(allc[0])

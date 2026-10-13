@@ -173,7 +173,7 @@ def detect_ink_regions(img, ocr_boxes, max_side=1800):
     return out
 
 
-def figures(page, avoid, segs):
+def figures(page, avoid, segs, drawings=None):
     """Image and vector-drawing regions large enough to be figures (merged first, filtered after)."""
     W, H = page.rect.width, page.rect.height
     rects, raster = [], []
@@ -183,10 +183,12 @@ def figures(page, avoid, segs):
     except Exception:
         pass
     try:
-        rects += [tuple(r) for r in page.cluster_drawings()]
+        rects += [tuple(r) for r in (page.cluster_drawings(drawings=drawings) if drawings is not None else page.cluster_drawings())]
     except Exception:
         pass
     rects = [r for r in rects if (r[2] - r[0]) >= 3 and (r[3] - r[1]) >= 3 and not any(overlap_frac(r, a) > 0.5 for a in avoid)]
+    if len(rects) > 300:            # extremely busy vector pages (maps, plots): one merged region per cluster pass
+        rects = sorted(rects, key=lambda r: (r[1], r[0]))[:300]
     g, merged = 12, True
     while merged:
         merged = False
@@ -260,7 +262,8 @@ def ocr_lines(words, k, min_conf=0.25):
         good = [w for w in ws if _GOOD.match(w["text"]) and w["conf"] >= 0.6]
         mean = sum(w["conf"] for w in ws) / len(ws)
         plaus = sum(1 for w in ws if _GOOD.match(w["text"])) / len(ws)
-        if len(good) >= 2 or (len(good) == 1 and (len(ws) <= 2 and mean >= 0.7)) or (mean >= 0.8 and plaus >= 0.5):
+        formula = mean >= 0.6 and any(re.search(r"[=<>≤≥≈]", w["text"]) for w in ws) and any(re.search(r"\w", w["text"]) for w in ws)
+        if len(good) >= 2 or (len(good) == 1 and (len(ws) <= 2 and mean >= 0.7)) or (mean >= 0.8 and plaus >= 0.5) or formula:
             out.append(OcrLine(ws, k))
     return out
 
@@ -645,8 +648,8 @@ def process(path, filename, doc_id, out_dir, prog, save_images=True, include_fur
                    engines=dict(ocr=ocr.available(), vision=vision.info(), math_recognizer=recognizers.info()),
                    timings=timings, config=dict(remove_furniture=headers_footers.enabled() if include_furniture is None else not include_furniture))
         doc["markdown"] = mdgen.render(doc, include_furniture=bool(include_furniture))
-        with open(os.path.join(out_dir, "document.json"), "w") as f:
-            json.dump(doc, f)
+        with open(os.path.join(out_dir, "document.json"), "w", encoding="utf-8") as f:
+            json.dump(doc, f, ensure_ascii=True)       # ASCII-escaped: valid even if a PDF carried invalid code points
     prog.set("OUTPUT", "done", "Markdown + JSON ready")
     if kind == "pdf":
         src.close()
@@ -723,7 +726,14 @@ def _analyze_digital(ctx, segs, warnings):
         drawings = p.get_drawings()
     except Exception:
         drawings = []
-    hr, vr = tables.rules_from_drawings(drawings, W, H)
+    busy = len(drawings) > int(os.getenv("PARSEFLOW_BUSY_VECTOR_PATHS", "2500"))
+    if busy:
+        # maps, CAD, dense plots: thousands of vector paths. Table-grid search and path clustering would dominate
+        # the runtime; the vector art is treated as one figure region instead (bounded cost).
+        ctx.setdefault("notes", []).append(f"{len(drawings)} vector paths: busy-graphics mode (no grid-table search)")
+        hr, vr = [], []
+    else:
+        hr, vr = tables.rules_from_drawings(drawings, W, H)
     ctx["hrules"] = hr
     # display equations first (their aligned pieces must not be mistaken for table cells)
     eqs = display_equations(segs, hr, body, None) if ctx["route"] == "digital" else []
@@ -731,7 +741,7 @@ def _analyze_digital(ctx, segs, warnings):
     noneq = [s for s in segs if id(s) not in eq_ids]
     # tables
     ruled = tables.detect_ruled(p, noneq, len(vr) >= 2, hr, vr) if ctx["route"] == "digital" else []
-    aligned, used = tables.detect_aligned(noneq, hr, body, W, exclude=[t.bbox for t in ruled] + [e["bbox"] for e in eqs])
+    aligned, used = tables.detect_aligned(noneq, hr, body, W, exclude=[t.bbox for t in ruled] + [e["bbox"] for e in eqs]) if not busy else ([], set())
     tbs = ruled + aligned
     hdr_used = set()
     for t in tbs:
@@ -742,7 +752,13 @@ def _analyze_digital(ctx, segs, warnings):
     in_table = lambda s: any(overlap_frac(s.bbox, tb) > 0.6 for tb in tboxes)
     rest = [s for s in noneq if not in_table(s) and id(s) not in hdr_used]
     # figures
-    figs = figures(p, tboxes + [e["bbox"] for e in eqs], rest)
+    if busy:
+        xs = [d["rect"] for d in drawings if d.get("rect") is not None]
+        art = (min(r.x0 for r in xs), min(r.y0 for r in xs), max(r.x1 for r in xs), max(r.y1 for r in xs)) if xs else None
+        figs = [tuple(art)] if art and (art[2] - art[0]) * (art[3] - art[1]) > 0.05 * W * H else []
+    else:
+        figs = figures(p, tboxes + [e["bbox"] for e in eqs], rest, drawings)
+    figs = [(max(0, f[0]), max(0, f[1]), min(W, f[2]), min(H, f[3])) for f in figs if min(W, f[2]) > max(0, f[0]) and min(H, f[3]) > max(0, f[1])]
     fig_label = {}
     keep = []
     for s in rest:
@@ -855,6 +871,11 @@ def _blocks_for_page(ctx, state):
             else:
                 text, tr = layout.join_lines(vlines, vocab)
             raw = "\n".join(raw_lines)
+            if is_ocr and all(isinstance(l, OcrLine) for l in it.lines) and _looks_like_formula(text):
+                eqb = _scanned_equation(ctx, it, text, n, ro, state)
+                if eqb is not None:
+                    blocks.append(eqb)
+                    continue
             if is_ocr and any(isinstance(l, OcrLine) for l in it.lines):
                 conf = statistics.mean(getattr(l, "conf", 0.99) for l in it.lines)
                 b = make_block("", typ, n, scale(it.bbox), conf, "ocr", "ocr", text, level=lvl if typ == "heading" else None)
@@ -912,6 +933,42 @@ def _blocks_for_page(ctx, state):
         b["raw_text"] = s.text; b["font_size"] = round(s.size, 2); b["reading_order"] = ro
         blocks.append(b)
     return blocks
+
+
+_MATHY = set("=+−-×÷^_∑∫∏√∞≤≥≠≈±∂∇∈∉⊂⊆∪∩→←⇒⇔()[]{}|/<>'") | set("αβγδεζηθικλμνξπρστυφχψωΓΔΘΛΞΠΣΦΨΩ")
+
+
+def _looks_like_formula(t):
+    vis = [c for c in t if not c.isspace()]
+    if len(vis) < 3 or len(vis) > 160:
+        return False
+    words = re.findall(r"[A-Za-z]{4,}", t)
+    sym = sum(1 for c in vis if c in _MATHY)
+    return sym / len(vis) >= 0.2 and len(words) <= 2 and any(c in "=<>≤≥≈∑∫" for c in vis)
+
+
+def _scanned_equation(ctx, para, text, n, ro, state):
+    """Equation-looking OCR line on a scan: run the optional local recognizer on its crop only."""
+    img = ctx.get("img")
+    rinfo = recognizers.info()
+    if rinfo["ready"] and img is not None and state.get("math_left", 20) > 0:
+        state["math_left"] = state.get("math_left", 20) - 1
+        bb = para.bbox
+        pad = 4
+        crop = img.crop((max(0, int(bb[0] * Z) - pad), max(0, int(bb[1] * Z) - pad), int(bb[2] * Z) + pad, int(bb[3] * Z) + pad))
+        r = recognizers.recognize(crop)
+        if r:
+            lx, conf = r
+            b = make_block("", "equation", n, scale(bb), conf, "model (self-reported)", "math_model", text, latex=lx.strip(), math_display=True,
+                           raw_text=text, transforms=[f"LaTeX from local recognizer '{rinfo['name']}' on the region crop; OCR text kept as raw_text"])
+            b["reading_order"] = ro
+            return b
+    b = make_block("", "paragraph", n, scale(para.bbox), statistics.mean(getattr(l, "conf", 0.5) for l in para.lines), "ocr", "ocr", text, raw_text=text)
+    b["warnings"].append("Possible equation in a scan: OCR text kept, not converted to LaTeX" +
+                         ("" if rinfo["ready"] else " (no local formula recognizer configured: PARSEFLOW_MATH_RECOGNIZER)") + ".")
+    b["possible_equation"] = True
+    b["reading_order"] = ro
+    return b
 
 
 def _equation_blocks(e, n, body, ro):

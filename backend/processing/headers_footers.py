@@ -93,17 +93,17 @@ def classify(pages, body_size):
             strong = False      # at least one structural signal is required for removal
             top = y1 <= 0.12 * H or (y0 <= 0.07 * H and y1 <= 0.16 * H)
             bottom = y0 >= 0.88 * H or (y1 >= 0.93 * H and y0 >= 0.84 * H)
-            others = [o for o in body if o is not it]
-            if not top and not bottom and others and words <= 12:
+            if not top and not bottom and words <= 12 and PAGE_NUM.match(text):
+                others = [o for o in body if o is not it]
                 # pages whose content ends (or starts) far from the paper edge: the last/first isolated line
                 # of the content is the edge for page-number purposes
                 below = [o for o in others if o["bbox"][1] >= y1 - 1]
                 above = [o for o in others if o["bbox"][3] <= y0 + 1]
                 gap_above = min((y0 - o["bbox"][3] for o in above), default=H)
                 gap_below = min((o["bbox"][1] - y1 for o in below), default=H)
-                if not below and y0 >= 0.45 * H and gap_above > 1.3 * body_size and PAGE_NUM.match(text):
+                if others and not below and y0 >= 0.45 * H and gap_above > 1.3 * body_size:
                     bottom = True
-                elif not above and y1 <= 0.55 * H and gap_below > 1.3 * body_size and PAGE_NUM.match(text):
+                elif others and not above and y1 <= 0.55 * H and gap_below > 1.3 * body_size:
                     top = True
             side = it.get("rotated") and (x1 <= 0.12 * W or x0 >= 0.88 * W)
             if it.get("rotated") and not side and (x1 <= 0.2 * W or x0 >= 0.8 * W):

@@ -20,7 +20,8 @@ _BULLET = re.compile(r"^\s*[•‣●○▪■∙·➢⁃•◦▪]\s*")
 
 
 def _nfc(s):
-    return unicodedata.normalize("NFC", s or "")
+    s = (s or "").encode("utf-8", "replace").decode("utf-8")     # never emit invalid code points (lone surrogates)
+    return unicodedata.normalize("NFC", s)
 
 
 def _escape_line_start(t):

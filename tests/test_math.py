@@ -111,3 +111,42 @@ def test_command_recognizer_plugin(monkeypatch, tmp):
     assert recognizers.recognize(Image.new("RGB", (40, 20), "white")) == ("x^{2}", 0.6)
     monkeypatch.setenv("PARSEFLOW_MATH_RECOGNIZER", "none")
     recognizers._STATE["name"] = None
+
+
+def _scanned_equation_pdf(tmp):
+    import io
+    import pymupdf
+    src = pymupdf.open()
+    p = src.new_page(width=612, height=300)
+    p.insert_text((72, 80), "The relation used in this section is", fontsize=12, fontname="tiro")
+    p.insert_text((200, 140), "y = 2x + 3z", fontsize=16, fontname="tiro")
+    pix = p.get_pixmap(matrix=pymupdf.Matrix(2, 2))
+    doc = pymupdf.open()
+    q = doc.new_page(width=612, height=300)
+    q.insert_image(q.rect, stream=pix.tobytes("png"))
+    f = tmp / "scan_eq.pdf"
+    doc.save(str(f))
+    return f
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.ocr
+def test_scanned_equation_uses_recognizer_only_on_region(tmp, convert, monkeypatch):
+    script = tmp / "rec.sh"
+    script.write_text("#!/bin/sh\necho 'y = 2x + 3z'\n")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PARSEFLOW_MATH_RECOGNIZER", "command")
+    monkeypatch.setenv("PARSEFLOW_MATH_CMD", str(script))
+    recognizers._STATE["name"] = None
+    d = convert(_scanned_equation_pdf(tmp))
+    eq = [b for b in d["blocks"] if b["type"] == "equation"]
+    assert eq and eq[0]["extractor"] == "math_model" and eq[0]["latex"] == "y = 2x + 3z"
+    assert eq[0]["verification"] == "review" and eq[0]["raw_text"]
+    assert "\\[y = 2x + 3z\\]" in d["markdown"]
+    monkeypatch.setenv("PARSEFLOW_MATH_RECOGNIZER", "none")
+    recognizers._STATE["name"] = None
+    d2 = convert(_scanned_equation_pdf(tmp))
+    flagged = [b for b in d2["blocks"] if b.get("possible_equation")]
+    assert flagged and any("not converted to LaTeX" in w for w in flagged[0]["warnings"])

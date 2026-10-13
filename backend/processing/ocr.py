@@ -124,7 +124,10 @@ def assess(img):
     a, k = _small(g)
     p50 = float(np.percentile(a, 50))
     # contrast = background level minus ink level; percentiles of the whole page fail when text is sparse
-    ink_level, bg_level = np.percentile(a, [0.3, 60])
+    flat = np.sort(a, axis=None)
+    nd = max(30, int(0.0005 * flat.size))
+    ink_level = float(flat[:nd].mean())            # the darkest few hundred pixels: robust when text is sparse
+    bg_level = float(np.percentile(a, 60))
     contrast = float(bg_level - ink_level)
     win = max(15, int(min(a.shape) / 12) | 1)
     bg = ndi.grey_closing(a, size=(7, 7))

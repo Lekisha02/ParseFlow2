@@ -87,17 +87,20 @@ def main(argv=None):
         rec = dict(input=path, output=str(o) if res.get("ok") else None, ok=bool(res.get("ok")), seconds=round(res.get("seconds", 0), 3),
                    pages=res.get("pages"), error=res.get("error"), warnings=res.get("warnings", []))
         if res.get("ok"):
-            o.parent.mkdir(parents=True, exist_ok=True)
-            tmp = o.with_suffix(".md.part")
-            tmp.write_text(res["markdown"], encoding="utf-8")
-            os.replace(tmp, o)
-            if a.json and res.get("doc") is not None:
-                jp = o.with_suffix(".json")
-                jp.write_text(json.dumps(res["doc"], ensure_ascii=False), encoding="utf-8")
-                rec["json"] = str(jp)
+            try:
+                o.parent.mkdir(parents=True, exist_ok=True)
+                tmp = o.with_suffix(".md.part")
+                tmp.write_text(res["markdown"], encoding="utf-8", errors="replace")
+                os.replace(tmp, o)
+                if a.json and res.get("doc") is not None:
+                    jp = o.with_suffix(".json")
+                    jp.write_text(json.dumps(res["doc"], ensure_ascii=True), encoding="utf-8")
+                    rec["json"] = str(jp)
+            except Exception as e:      # one unwritable result must not stop the batch
+                rec.update(ok=False, output=None, error=f"could not write output: {type(e).__name__}: {e}")
         results.append(rec)
         if a.log_json:
-            print(json.dumps(rec, ensure_ascii=False), flush=True)
+            print(json.dumps(rec, ensure_ascii=True), flush=True)
         else:
             status = "ok " if rec["ok"] else "ERR"
             print(f"[{len(results)}/{len(plan)}] {status} {rec['seconds']:7.2f}s  {path}" + ("" if rec["ok"] else f"  -> {rec['error']}"), file=sys.stderr, flush=True)
@@ -111,7 +114,7 @@ def main(argv=None):
                    pages=sum(r.get("pages") or 0 for r in results if r["ok"]), output_dir=str(out_dir))
     if a.report:
         Path(a.report).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.report).write_text(json.dumps(dict(summary=summary, results=results), indent=1, ensure_ascii=False), encoding="utf-8")
+        Path(a.report).write_text(json.dumps(dict(summary=summary, results=results), indent=1, ensure_ascii=True), encoding="utf-8")
     print(f"parseflow: {ok}/{len(results)} converted, {len(failed)} failed, {summary['pages']} pages in {wall:.1f}s -> {out_dir}", file=sys.stderr)
     for r in failed:
         print(f"  FAILED {r['input']}: {r['error']}", file=sys.stderr)

@@ -39,7 +39,12 @@ def _worker(path, opts, q):
     t0 = time.perf_counter()
     try:
         doc = convert(path, include_furniture=opts.get("include_furniture", False))
-        res = dict(ok=True, seconds=time.perf_counter() - t0, pages=len(doc["pages"]),
+        try:
+            import resource
+            rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0   # Linux: KiB -> MiB
+        except Exception:
+            rss = None
+        res = dict(ok=True, seconds=time.perf_counter() - t0, pages=len(doc["pages"]), max_rss_mb=rss,
                    page_seconds=[p.get("seconds") for p in doc["pages"]], timings=doc.get("timings"),
                    routes=[p.get("route") for p in doc["pages"]], warnings=doc.get("warnings", []))
         if opts.get("per_page_markdown"):
