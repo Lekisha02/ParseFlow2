@@ -10,7 +10,8 @@ try:
     for line in (ROOT/".env").read_text().splitlines():
         if "=" in line and not line.startswith("#"):
             k, v = line.split("=", 1)
-            if v.strip(): os.environ.setdefault(k.strip(), v.strip())
+            v = v.split("#", 1)[0].strip()
+            if v: os.environ.setdefault(k.strip(), v)
 except FileNotFoundError: pass
 from processing import pipeline, ocr, vision, recognizers
 from processing import markdown as mdgen
