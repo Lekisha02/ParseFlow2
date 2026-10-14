@@ -43,3 +43,11 @@ frontend features, upload workflow and downloads are kept; JSON changes are addi
 | `backend/processing/layout.py`, `tables.py`, `mathtex.py` | Numbered pseudo-code / enumerated listings are not tables; code paragraphs keep indentation and skip inline math; Unicode super/subscripts in LaTeX; crash on multi-code-point glyphs fixed. |
 | `frontend/index.html`, `frontend/vendor/katex/` | Ask tab uses the API and renders math (KaTeX, vendored), code, lists and tables, with evidence snippets and suggested questions from the document; math rendered in Inspector/Blocks/Tables; lazy thumbnails, paged long lists, server-side upload limit. The post-upload screens look the same. |
 | `tests/test_ask_and_large_docs.py` (new) | Ask answers, API, on-demand images, slice equivalence, page progress, long-document furniture. |
+
+## v2.2 — new landing page, accounts and saved documents
+| File | Change |
+|---|---|
+| `backend/accounts.py` (new) | SQLite users / sessions / documents; scrypt passwords; hashed session tokens; login rate limit; library stats. |
+| `backend/app.py` | Auth, account and library endpoints; uploads by a logged-in user are saved; owner-only access to saved documents; guest expiry skips saved documents. |
+| `frontend/index.html` | New landing page (logo, Try Live Demo, Log in / Sign up, auto-playing 7-slide feature tour replacing "Present 90s demo", upload card with guest / save options, moving feature ticker, features, stages, drop zone, footer); sign-in dialog; logged-in workspace (sidebar, library with filters, search, preview panel, rename/delete/download, settings, privacy). Processing screen and viewer unchanged; *New document* returns to the landing page or the library. Logo gradient now renders in every view. |
+| `tests/test_accounts.py` (new) | Sign-up/login/logout, password + session storage, rate limit, privacy of saved documents, guest behaviour, rename/delete/expiry, settings, account deletion, interrupted jobs. |

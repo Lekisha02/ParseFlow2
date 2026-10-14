@@ -134,6 +134,10 @@ Or install as a package (provides the `parseflow` command): `pip install -e ".[s
 bash run.sh          # Linux/macOS  (run.bat on Windows)  → http://localhost:8000
 ```
 
+**Screens.** The landing page has the logo top-left, *Try Live Demo* and *Log in / Sign up* top-right, an auto-playing feature tour (7 slides, pauses on hover, arrows/dots to step; it replaces the old "Present 90s demo" button), the upload card, and — further down — features, the seven stages and a drop zone. After an upload, the processing screen and the document viewer are exactly the v2 screens.
+
+**Guests and accounts.** Without an account, a file is processed and opened in the viewer, and deleted from the server after `PARSEFLOW_JOB_TTL_HOURS`. With an account (email + password, stored on this server only — no third-party login), every upload is also saved to *My documents*: a workspace with a left sidebar (upload, My documents, Needs review, recent files, Settings, Privacy & data, storage used, log out), filters, search by name, a preview panel (first page, summary, open in viewer, Markdown/JSON download, rename, delete) and account settings (name, password, delete account). *New document* in the viewer returns guests to the landing page and logged-in users to their library. Passwords are salted scrypt hashes; sessions are random tokens in an HttpOnly, SameSite=Lax cookie (only their SHA-256 is stored); saved documents are readable only by their owner. Set `PARSEFLOW_SECURE_COOKIE=1` when the app is served over HTTPS.
+
 ### One-command CLI (offline, no API keys)
 ```bash
 ./parseflow input_pdfs/ --output-dir output_markdown/
@@ -175,9 +179,12 @@ print(doc["markdown"])
 | `GET /api/document/{id}/markdown` | **new**: canonical Markdown; `?include_furniture=1` restores headers/footers, `?annotate=0` drops HTML-comment warnings |
 | `GET /api/page/{id}/{n}.png` | page image for the viewer; rendered on first request and cached (digital pages are not rasterised during processing) |
 | `GET /api/thumb/{id}/{n}.jpg` | **new**: small JPEG thumbnail for the page strip, rendered on demand and cached |
+| `POST /api/auth/signup` · `POST /api/auth/login` · `POST /api/auth/logout` · `GET /api/auth/me` | **new**: accounts; JSON bodies `{name, email, password}` / `{email, password}`; session cookie `pf_session` |
+| `GET /api/my/documents` · `PATCH /api/my/documents/{id}` · `DELETE /api/my/documents/{id}` | **new**: the logged-in user's library (status, live progress, per-document stats, usage), rename (`{filename}`), delete |
+| `PATCH /api/account` · `POST /api/account/password` · `POST /api/account/delete` | **new**: change name, change password (signs out other sessions), delete account and all its documents |
 | `GET /api/ask/{id}?q=...` | **new**: Ask Your Document — extractive answer (`parts` typed as text with inline LaTeX, math, code, list, table, heading), `strategy` (page · table cell · section · passage), `evidence` with block ids, `confidence`, matched/missing terms; `found=false` with the closest passages when nothing matches |
 
-Uploads that fail validation are deleted immediately; processed documents expire after `PARSEFLOW_JOB_TTL_HOURS` (default 24). The frontend renders the backend Markdown (with an *include running headers/footers* toggle) and keeps its own `md()` only for demo/browser mode.
+Uploads that fail validation are deleted immediately; guest documents expire after `PARSEFLOW_JOB_TTL_HOURS` (default 24); documents uploaded while logged in are kept until their owner deletes them. Document routes (`/api/document`, `/markdown`, `/status`, `/page`, `/thumb`, `/ask`) answer 404 for a saved document unless the request carries its owner's session; guest documents stay reachable by their unguessable id, as before. The frontend renders the backend Markdown (with an *include running headers/footers* toggle) and keeps its own `md()` only for demo/browser mode.
 
 ---
 
@@ -197,7 +204,8 @@ Uploads that fail validation are deleted immediately; processed documents expire
 | `PARSEFLOW_REMOVE_FURNITURE` | 1 | exclude confidently detected headers/footers from Markdown |
 | `PARSEFLOW_MATH_RECOGNIZER` | none | `none` · `pix2tex` · `rapid_latex_ocr` · `command` (scanned equations) |
 | `PARSEFLOW_MATH_MODEL_DIR`, `PARSEFLOW_MATH_CMD` | – | local weights folder / external recognizer command |
-| `PARSEFLOW_DATA_DIR`, `PARSEFLOW_JOB_TTL_HOURS`, `PARSEFLOW_WORKERS` | data/, 24, 2 | API storage, expiry, concurrency |
+| `PARSEFLOW_DATA_DIR`, `PARSEFLOW_JOB_TTL_HOURS`, `PARSEFLOW_WORKERS` | data/, 24, 2 | API storage (documents + `parseflow.db` with accounts), guest expiry, concurrency |
+| `PARSEFLOW_SESSION_DAYS`, `PARSEFLOW_SECURE_COOKIE` | 30, 0 | login session lifetime; set the cookie's `Secure` flag (use with HTTPS) |
 
 ### Formula recognition for scanned equations (optional)
 Digital PDFs need no model. For equations in **scans**, a recognizer can be plugged in; it runs only on detected equation regions and **never downloads weights at runtime** (missing weights are reported via `/api/health` and block warnings):
@@ -273,7 +281,8 @@ Hardware: Intel Xeon @ 2.80 GHz, 2 logical cores, 7.8 GB RAM, Linux; PyMuPDF 1.2
 ```text
 PARSERFLOWS/
 ├── backend/
-│   ├── app.py                FastAPI app (API unchanged + markdown endpoint)
+│   ├── app.py                FastAPI app (v1 API + markdown, ask, thumbnails, accounts, library)
+│   ├── accounts.py           local accounts, sessions, saved documents (SQLite, stdlib only)
 │   ├── cli.py                batch CLI
 │   └── processing/
 │       ├── pipeline.py       stages, routing, assembly, timings

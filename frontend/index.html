@@ -90,23 +90,233 @@ details{margin:3px 0}summary{cursor:pointer;color:var(--ac)}.js-k{color:#9cdcfe}
 .mock{transition:transform .4s}.mock:hover{transform:perspective(1200px) rotateX(2deg) translateY(-4px)}
 .tour{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(700px,92vw);background:color-mix(in srgb,var(--p) 92%,transparent);backdrop-filter:blur(14px);border:1px solid var(--ac);border-radius:14px;padding:14px 18px;z-index:50;box-shadow:0 24px 70px #000b,0 0 40px #6ea8fe30;display:none;animation:up .3s}.tour.on{display:block}@keyframes up{from{opacity:0;transform:translate(-50%,10px)}}
 .tour .sn{font:11px 'JetBrains Mono',monospace;color:var(--ac);letter-spacing:.5px}.tour h4{margin:2px 0;font-size:16px}.tour p{margin:2px 0 12px;font-size:14px;color:var(--mu)}.tour .ctl{display:flex;gap:8px;align-items:center}.tour .dots{display:flex;gap:5px;margin-right:auto}.tour .dots i{width:18px;height:3px;border-radius:2px;background:var(--bd)}.tour .dots i.on{background:var(--ac)}.tour kbd{font:11px 'JetBrains Mono',monospace;border:1px solid var(--bd);border-radius:4px;padding:0 5px;color:var(--mu)}
-</style></head><body>
-<section id="landing" class="view on"><div class="orb o1"></div><div class="orb o2"></div><nav class="nav"><div class="logo"><svg viewBox="0 0 32 32"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ea8fe"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="7" fill="url(#lg)"/><path d="M10 9h8a4 4 0 010 8h-8M10 9v14M20 20l3 3 4-5" stroke="#0a0b0d" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>ParseFlow</div><span id="beb" class="cap"><i></i>checking backend…</span></nav>
-<div class="hero"><div class="badge"><i></i>DataQuest 3.0 · DQCL ParseAnything · Team DEADLOCK</div>
-<h1>Parse<span>Flow</span></h1><div class="tag">Evidence-preserving document intelligence</div>
-<p>Convert complex documents—including scanned and handwritten content—into structured, verifiable data while preserving the evidence behind every result.</p>
-<div class="cta"><button class="btn go" onclick="present()">▶ Present 90s demo</button><button class="btn pri" onclick="fi.click()">Upload Document</button><button class="btn" onclick="startDemo()">Try Live Demo</button></div>
-<input id="fi" type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.json" onchange="onFile(this.files[0])">
-<div class="drop" id="drop" onclick="fi.click()"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Drop a document</b> · PDF, PNG, JPG/JPEG · or a Digital Twin <span class="mono">.json</span></span></div><div id="uerr"></div></div>
-<div class="show"><div class="mock"><div class="l" id="mockl"></div><div class="r"><div class="bar0"><i></i><i></i><i></i></div><div class="k" style="margin-top:0">Selected region · <span id="mkid"></span></div><pre id="mockj"></pre></div></div></div>
-<div class="pipe"><span>DOCUMENT</span><i>→</i><span>UNDERSTAND</span><i>→</i><span>ROUTE</span><i>→</i><span>EXTRACT</span><i>→</i><span>ASSEMBLE</span><i>→</i><span>VERIFY</span><i>→</i><span>TRACE</span></div>
-<div class="feat"><div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/></svg></div><h4>Local-first, vision-when-needed</h4><p>Digital text and tables are parsed locally. OCR handles scans. Only handwriting, charts and diagrams go to a vision model.</p></div>
-<div class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg></div><h4>Every block carries its evidence</h4><p>Page, bounding box, extractor and confidence — with one-click View Source that highlights the exact region.</p></div>
-<div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><h4>Flags instead of guessing</h4><p>Unreadable handwriting is withheld and marked for review. Verified means independent evidence exists.</p></div></div></section>
+/* ---------------- landing (v2.1) ---------------- */
+#landing{background:var(--bg)}
+.lp-top{position:relative;background:radial-gradient(900px 460px at 50% -60px,#6ea8fe2e,transparent 70%),radial-gradient(520px 320px at 88% 6%,#a78bfa22,transparent 70%),radial-gradient(#ffffff0d 1px,transparent 1px) 0 0/24px 24px,var(--bg);padding-bottom:28px}
+.lp-nav{display:flex;align-items:center;gap:22px;padding:16px clamp(16px,4vw,56px);border-bottom:1px solid #ffffff0d;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px);background:color-mix(in srgb,var(--bg) 70%,transparent)}
+.lp-logo{display:flex;gap:10px;align-items:center;font-weight:650;font-size:19px;letter-spacing:-.3px;color:var(--tx);text-decoration:none}.lp-logo svg{width:30px;height:30px;flex:none}.lp-logo.sm{font-size:15px}.lp-logo.sm svg{width:22px;height:22px}
+.lp-links{display:flex;gap:24px;margin-left:18px}.lp-links a{color:var(--mu);text-decoration:none;font-size:14px}.lp-links a:hover{color:var(--tx)}
+.lp-sp{flex:1}.lp-auth{display:flex;gap:8px;align-items:center}
+.btn.ghost{background:transparent}
+.lp-hero{display:grid;grid-template-columns:minmax(360px,460px) minmax(0,1fr);gap:44px;padding:44px clamp(16px,4vw,56px) 0;align-items:start;max-width:1440px;margin:0 auto}
+.lp-badge{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--bd);background:#ffffff08;border-radius:20px;padding:5px 14px;font-size:12.5px;color:var(--mu)}.lp-badge i{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px var(--ac)}
+.lp-h1{font-size:clamp(40px,4.6vw,64px);line-height:1.03;letter-spacing:-2.4px;margin:20px 0 14px;font-weight:700;background:linear-gradient(180deg,var(--tx),#9aa4b5);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lp-h1 span{background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lp-sub{color:var(--mu);font-size:17px;margin:0 0 24px}
+.lp-up{border:1px solid var(--bd);background:var(--p);border-radius:14px;padding:16px;box-shadow:0 20px 60px #0006}
+.lp-uprow{display:flex;gap:10px}.lp-big{flex:1;justify-content:center;padding:12px!important;font-size:15px}.lp-big2{padding:12px 16px!important}
+.lp-opts{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lp-opt{border:1px solid var(--bd);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--mu);text-align:left;background:transparent;line-height:1.4}.lp-opt b{color:var(--tx);display:block;font-size:13px;margin-bottom:2px;font-weight:600}
+.lp-opt.on{border-color:#6ea8fe77;background:#6ea8fe12}button.lp-opt:hover{border-color:var(--ac)}
+.lp-fmts{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center}.lp-fmts span{font:11.5px 'JetBrains Mono',monospace;color:var(--mu);border:1px solid var(--bd);border-radius:5px;padding:2px 8px}.lp-fmts em{font-style:normal;color:var(--mu);font-size:12px}
+#uerr .err{margin:14px 0 0;max-width:none}
+/* banner */
+.lp-banner{border:1px solid var(--bd);border-radius:18px;background:var(--p);overflow:hidden;box-shadow:0 30px 90px #000a,0 0 0 1px #ffffff08 inset}
+.bn-h{display:flex;align-items:center;gap:9px;padding:11px 16px;border-bottom:1px solid var(--bd);font-size:12.5px;white-space:nowrap;overflow:hidden}.bn-mu{color:var(--mu)}
+.bn-live{display:inline-flex;align-items:center;gap:6px;color:var(--ok);font-weight:600;letter-spacing:.4px}.bn-live i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:bnp 1.6s infinite}@keyframes bnp{50%{opacity:.35}}
+.bn-slide{display:grid;grid-template-columns:minmax(200px,38%) 1fr;height:400px}
+.bn-doc{background:var(--p2);border-right:1px solid var(--bd);padding:20px;position:relative;overflow:hidden}
+.bn-paper{background:#fff;border-radius:3px;height:100%;padding:16px;position:relative;box-shadow:0 10px 30px #000a;overflow:hidden;animation:bnin .5s ease}
+.bn-out{padding:20px 24px;position:relative;overflow:hidden;animation:bnin .5s ease .08s both}
+@keyframes bnin{from{opacity:0;transform:translateY(10px)}}
+.bn-out h3{margin:0 0 4px;font-size:21px;letter-spacing:-.5px}.bn-out .bn-d{color:var(--mu);font-size:13.5px;margin-bottom:4px}
+.bn-k{color:var(--mu);font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;margin:14px 0 6px;display:flex;gap:8px;align-items:center}
+.bn-out pre{margin:0;font-size:11.5px;max-height:150px;overflow:hidden}
+.bn-out table.t{font-size:12.5px}
+.ln{height:6px;background:#d6d9de;border-radius:2px;margin:6px 0}.ln.h{height:9px;background:#9aa1ab;width:70%}
+.hl{position:absolute;border:2.5px solid var(--ok);background:#3ecf8e22;border-radius:3px;animation:hlp 2.2s ease-in-out infinite}.hl.sel{border-color:var(--ac);background:#6ea8fe26;box-shadow:0 0 0 4px #6ea8fe22}.hl.w{border-color:var(--wn);background:#f5b94222;border-style:dashed}.hl.e{border-color:var(--er);background:#f2686b1c;border-style:dashed}
+@keyframes hlp{50%{box-shadow:0 0 0 6px #6ea8fe18}}
+.hl-tag{position:absolute;font:600 10.5px 'JetBrains Mono',monospace;background:var(--ac);color:#0a0b0d;padding:1px 6px;border-radius:3px;z-index:2}.hl-tag.w{background:var(--wn)}.hl-tag.e{background:var(--er)}.hl-tag.g{background:var(--ok)}
+.bn-tbl{margin-top:12px;border-top:1.5px solid #333;border-bottom:1.5px solid #333;padding:4px 0}.bn-tbl div{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:6px;margin:5px 0}.bn-tbl div span{height:5px;background:#b9bec6;border-radius:2px}.bn-tbl div.h span{background:#555}
+.bn-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.bn-chip{display:inline-flex;gap:6px;align-items:center;font-size:12px;border:1px solid var(--bd);border-radius:14px;padding:3px 10px;margin:0 6px 6px 0;color:var(--mu);background:var(--p2)}.bn-chip b{color:var(--tx);font-weight:600}
+.bn-q{display:inline-block;background:var(--p2);border:1px solid var(--bd);border-radius:12px 12px 12px 3px;padding:7px 12px;font-size:13px}
+.bn-a{border-left:3px solid var(--ac);padding:4px 0 4px 12px;margin-top:10px;font-size:14px;line-height:1.6}
+.bn-step{display:flex;gap:8px;align-items:center;font-size:12.5px;margin:5px 0;color:var(--mu)}.bn-step b{color:var(--tx);font-weight:550}.bn-step i{font-style:normal;color:var(--ok)}
+.bn-scan{background:#e9e4d6!important;filter:contrast(.8);transform:rotate(-1.6deg)}.bn-scan .ln{background:#8c8778}.bn-scan:after{content:"";position:absolute;inset:0;background:radial-gradient(#0002 1px,transparent 1.5px) 0 0/7px 7px,radial-gradient(#0001 1px,transparent 1px) 3px 4px/11px 11px;pointer-events:none}
+.bn-hand{font:500 22px Caveat,'Comic Sans MS',cursive;color:#1e3a8a;line-height:1.2}
+.bn-f{display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid var(--bd);flex-wrap:wrap}
+.bn-arrow{width:30px;height:30px;border-radius:50%;border:1px solid var(--bd);display:grid;place-items:center;color:var(--mu);font-size:15px;background:transparent;padding:0}.bn-arrow:hover{color:var(--tx);border-color:var(--ac)}
+.bn-dots{display:flex;gap:6px}.bn-dots button{width:26px;height:4px;border-radius:2px;background:var(--bd);border:0;padding:0;position:relative;overflow:hidden}.bn-dots button.done{background:var(--ac)}
+.bn-dots button.on:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--ac),var(--ac2));transform-origin:left;animation:bnfill var(--bnt,5.5s) linear forwards}.lp-banner.paused .bn-dots button.on:after{animation-play-state:paused}
+@keyframes bnfill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.bn-labels{color:var(--mu);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 200px}.bn-labels b{color:var(--tx);font-weight:550}.bn-labels span{cursor:pointer}.bn-labels span:hover{color:var(--tx)}
+/* ticker */
+.lp-ticker{margin:26px clamp(16px,4vw,56px) 0;border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);padding:12px 0;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.lp-track{display:flex;gap:12px;width:max-content;animation:mq 46s linear infinite}.lp-ticker:hover .lp-track{animation-play-state:paused}
+.lp-track span{font-size:13px;color:var(--mu);border:1px solid var(--bd);border-radius:20px;padding:5px 14px;background:#ffffff05;white-space:nowrap}.lp-track span b{color:var(--tx);font-weight:550}
+@keyframes mq{to{transform:translateX(-50%)}}
+/* sections */
+.lp-sec{padding:76px clamp(16px,4vw,56px) 10px;max-width:1440px;margin:0 auto}
+.lp-eye{font:600 12px 'JetBrains Mono',monospace;color:var(--ac);letter-spacing:1.5px;text-transform:uppercase}
+.lp-h2{font-size:clamp(28px,3vw,40px);letter-spacing:-1.4px;margin:10px 0}
+.lp-lead{color:var(--mu);font-size:16.5px;max-width:720px;margin:0}
+.lp-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:32px}
+.lp-card{background:var(--p);border:1px solid var(--bd);border-radius:14px;padding:22px;transition:.2s}.lp-card:hover{transform:translateY(-3px);border-color:#6ea8fe66}
+.lp-card h4{margin:12px 0 6px;font-size:16px}.lp-card p{margin:0;color:var(--mu);font-size:14px}
+.lp-ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#6ea8fe26,#a78bfa26);border:1px solid #6ea8fe44}
+.lp-ic svg{width:20px;height:20px;stroke:var(--ac);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lp-pipe{display:flex;align-items:stretch;gap:10px;margin-top:32px;flex-wrap:wrap}
+.lp-pipe .s{background:var(--p);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;flex:1 1 130px;animation:lit2 10.5s infinite}
+.lp-pipe .s b{display:block;font:600 13px 'JetBrains Mono',monospace;color:var(--tx)}.lp-pipe .s small{color:var(--mu);font-size:12px}
+@keyframes lit2{0%,14%,100%{border-color:var(--bd);box-shadow:none}3%,11%{border-color:var(--ac);box-shadow:0 0 22px #6ea8fe33}}
+.lp-drop{margin:32px 0 0;border:2px dashed #6ea8fe55;border-radius:20px;background:radial-gradient(500px 220px at 50% 0,#6ea8fe14,transparent 70%),var(--p);padding:52px 24px;text-align:center;cursor:pointer;transition:.15s}
+.lp-drop:hover,.lp-drop.hv{border-color:var(--ac);background:radial-gradient(500px 220px at 50% 0,#6ea8fe26,transparent 70%),var(--p)}
+.lp-dropic{width:64px;height:64px;margin:0 auto 14px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--ac),var(--ac2))}
+.lp-dropic svg{width:30px;height:30px;stroke:#0a0b0d;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.lp-drop h3{font-size:26px;margin:0 0 6px;letter-spacing:-.6px}.lp-drop p{color:var(--mu);margin:0}.lp-drop u{color:var(--ac)}
+.lp-fmt{display:flex;justify-content:center;gap:8px;margin:18px 0 22px;flex-wrap:wrap}.lp-fmt span{font:600 12.5px 'JetBrains Mono',monospace;border:1px solid var(--bd);background:var(--p2);border-radius:7px;padding:6px 12px}.lp-fmt .lp-fmt2{font-weight:400;color:var(--mu)}
+.lp-dropbtns{display:inline-flex;justify-content:center;gap:12px;flex-wrap:wrap;cursor:default}
+.lp-note{color:var(--mu);font-size:12.5px;margin-top:14px}
+.lp-foot{border-top:1px solid var(--bd);margin-top:76px;padding:24px clamp(16px,4vw,56px);color:var(--mu);font-size:13px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}.lp-foot a{color:var(--mu)}
+.av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--ac2));display:grid;place-items:center;font-weight:700;color:#0a0b0d;font-size:12.5px;flex:none}
+/* ---------------- workspace ---------------- */
+.wsv{display:none;height:100%;grid-template-columns:252px minmax(0,1fr)}.wsv.on{display:grid}
+.ws-side{background:var(--p);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:18px 14px;min-height:0;overflow:auto}
+.ws-side .lp-logo{padding:2px 8px 18px;font-size:18px}.ws-side .lp-logo svg{width:28px;height:28px}
+.ws-upbtn{justify-content:center;padding:11px!important;display:flex}
+.ws-nav{margin-top:14px;display:flex;flex-direction:column;gap:2px}
+.ws-it{display:flex;gap:11px;align-items:center;padding:8px 10px;border-radius:8px;color:var(--mu);background:none;border:0;text-align:left;font-size:13.5px;width:100%}.ws-it:hover{color:var(--tx);background:var(--p2)}
+.ws-it.on{background:#6ea8fe14;color:var(--tx);box-shadow:inset 2px 0 0 var(--ac)}
+.ws-it svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ws-it em{margin-left:auto;font-style:normal;font-size:11.5px;color:var(--mu);background:var(--p2);border:1px solid var(--bd);border-radius:10px;padding:0 7px}
+.ws-it span.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-lab{font:600 11px 'JetBrains Mono',monospace;color:var(--mu);letter-spacing:1px;text-transform:uppercase;margin:20px 10px 0}
+.ws-recent{margin-top:6px}.ws-recent .ws-it{padding:6px 10px;font-size:13px}
+.ws-store{border:1px solid var(--bd);border-radius:10px;padding:11px 12px;margin:16px 0 12px;font-size:12.5px;color:var(--mu)}.ws-store b{color:var(--tx);font-weight:600}
+.ws-me{display:flex;gap:10px;align-items:center;border-top:1px solid var(--bd);padding:12px 4px 0}.ws-me .btn{white-space:nowrap;flex:none}.ws-me .who{min-width:0}.ws-me .who div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ws-head{display:flex;align-items:center;gap:12px;padding:14px 28px;border-bottom:1px solid var(--bd);background:linear-gradient(180deg,var(--p),var(--bg))}
+.ws-search{flex:1;max-width:520px;display:flex;gap:8px;align-items:center;background:var(--p2);border:1px solid var(--bd);border-radius:9px;padding:0 12px;color:var(--mu)}.ws-search svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;flex:none}.ws-search input{flex:1;background:transparent;border:0;color:var(--tx);padding:9px 0;font:inherit;outline:none}
+#wserr .err{margin:14px 28px 0;max-width:none}
+.ws-body{flex:1;overflow:auto;padding:24px 28px}
+.ws-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:22px;align-items:start}
+.ws-h2{margin:0;font-size:26px;letter-spacing:-.8px}
+.ws-chips{display:flex;gap:6px;margin:14px 0 16px;flex-wrap:wrap}.ws-chips button{font-size:12px;padding:4px 12px;border-radius:14px;border:1px solid var(--bd);color:var(--mu);background:none}.ws-chips button.on{color:var(--tx);border-color:var(--ac);background:#6ea8fe12}
+.ws-drop{border:1.5px dashed #6ea8fe55;border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:14px;background:radial-gradient(400px 120px at 20% 0,#6ea8fe12,transparent),var(--p);margin-bottom:18px;cursor:pointer;transition:.15s}.ws-drop:hover,.ws-drop.hv{border-color:var(--ac)}
+.ws-drop .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,var(--ac),var(--ac2));flex:none}.ws-drop .ic svg{width:20px;height:20px;stroke:#0a0b0d;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+table.ws-t{width:100%;border-collapse:collapse}
+.ws-t th{font:600 11px 'JetBrains Mono',monospace;color:var(--mu);text-transform:uppercase;letter-spacing:.8px;text-align:left;padding:8px 10px;border-bottom:1px solid var(--bd)}
+.ws-t td{padding:10px;border-bottom:1px solid var(--bd);font-size:13.5px;vertical-align:middle}.ws-t tr.r{cursor:pointer}.ws-t tr.r:hover td{background:var(--p)}.ws-t tr.sel td{background:#6ea8fe0f}
+.ws-t td.nm{max-width:0;width:40%}.ws-t td.nm div{display:flex;align-items:center;gap:10px;overflow:hidden}.ws-t td.nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fic{display:inline-grid;place-items:center;width:30px;height:36px;border-radius:5px;font:700 9px 'JetBrains Mono',monospace;color:#0a0b0d;flex:none}
+.mu{color:var(--mu)}
+.wpill{display:inline-flex;gap:6px;align-items:center;font-size:11.5px;padding:2px 9px;border-radius:12px;border:1px solid;white-space:nowrap}.wpill.ok{color:var(--ok);border-color:#3ecf8e88}.wpill.wn{color:var(--wn);border-color:#f5b94288}.wpill.run{color:var(--ac);border-color:#6ea8fe88}.wpill.er{color:var(--er);border-color:#f2686b88}
+.wpill.run:before{content:"";width:9px;height:9px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp 1s linear infinite}
+.ws-panel{background:var(--p);border:1px solid var(--bd);border-radius:14px;padding:16px;position:sticky;top:0}
+.ws-thumb{background:#fff;border-radius:6px;height:220px;display:grid;place-items:center;overflow:hidden;border:1px solid var(--bd)}.ws-thumb img{max-width:100%;max-height:100%;display:block}
+.ws-st{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ws-st div{background:var(--p2);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}.ws-st b{font-size:19px;display:block}.ws-st span{font-size:11px;color:var(--mu)}
+.ws-acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}.ws-acts .row2{display:flex;gap:8px}.ws-acts .btn{justify-content:center;display:flex}.ws-acts .row2 .btn{flex:1}.btn.danger{color:var(--er)}.btn.danger:hover{border-color:var(--er)}
+.ws-empty{border:1px solid var(--bd);border-radius:14px;padding:40px;text-align:center;color:var(--mu)}
+.ws-form{background:var(--p);border:1px solid var(--bd);border-radius:14px;padding:20px;max-width:640px;margin-bottom:16px}.ws-form h3{margin:0 0 4px;font-size:16px}.ws-form p{color:var(--mu);margin:0 0 14px;font-size:13.5px}
+.fld{display:block;margin-bottom:12px}.fld span{display:block;font-size:12.5px;color:var(--mu);margin-bottom:4px}.fld input{width:100%;background:var(--p2);border:1px solid var(--bd);border-radius:8px;color:var(--tx);padding:9px 11px;font:inherit}.fld input:focus{outline:none;border-color:var(--ac)}
+.okmsg{color:var(--ok);font-size:13px;margin-left:10px}.ermsg{color:var(--er);font-size:13px;margin:6px 0 10px}
+/* modal */
+.md-back{position:fixed;inset:0;background:#000a;backdrop-filter:blur(6px);display:none;place-items:center;z-index:80;padding:16px}.md-back.on{display:grid}
+.md-box{width:min(420px,100%);background:var(--p);border:1px solid var(--bd);border-radius:16px;padding:22px;box-shadow:0 30px 90px #000c;animation:up2 .25s}@keyframes up2{from{opacity:0;transform:translateY(10px)}}
+.md-box h3{margin:0 0 4px;font-size:20px;letter-spacing:-.4px}.md-box .sub{color:var(--mu);font-size:13.5px;margin:0 0 16px}
+.md-tabs{display:flex;gap:4px;background:var(--p2);border:1px solid var(--bd);border-radius:10px;padding:3px;margin-bottom:16px}.md-tabs button{flex:1;border:0;background:none;padding:7px;border-radius:7px;color:var(--mu)}.md-tabs button.on{background:var(--p);color:var(--tx);box-shadow:0 1px 0 #0004}
+.md-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+@media(max-width:1100px){.lp-grid3{grid-template-columns:repeat(2,minmax(0,1fr))}.lp-hero{grid-template-columns:minmax(0,1fr)}.lp-right{order:2}.lp-left,.lp-right{min-width:0}.ws-grid{grid-template-columns:1fr}.ws-panel{position:static}}
+@media(max-width:860px){.lp-links{display:none}.wsv.on{grid-template-columns:1fr;grid-template-rows:auto 1fr}.ws-side{flex-direction:row;flex-wrap:wrap;gap:8px;padding:10px 12px;align-items:center;border-right:0;border-bottom:1px solid var(--bd)}.ws-side .lp-logo{padding:0;font-size:16px}.ws-lab,.ws-recent,.ws-store,.ws-side>.lp-sp{display:none}.ws-nav{flex-direction:row;margin:0;flex-wrap:wrap}.ws-me{border:0;padding:0;margin-left:auto}.ws-me .who{display:none}.ws-upbtn{padding:8px 12px!important}.ws-head{padding:10px 12px}.ws-body{padding:16px 12px}.ws-t .hide-s{display:none}}
+@media(max-width:640px){.lp-grid3{grid-template-columns:1fr}.bn-slide{grid-template-columns:1fr;height:auto}.bn-doc{display:none}.lp-opts{grid-template-columns:1fr}.lp-nav .btn.go{display:none}.lp-uprow{flex-direction:column}}
+</style></head><body><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="pfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ea8fe"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs></svg>
+<section id="landing" class="view on">
+<div class="lp-top">
+<nav class="lp-nav">
+ <a class="lp-logo" href="#" onclick="lpTop(event)"><svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="7" fill="url(#pfg)"/><path d="M10 9h8a4 4 0 010 8h-8M10 9v14M20 20l3 3 4-5" stroke="#0a0b0d" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>ParseFlow</a>
+ <div class="lp-links"><a href="#features" onclick="lpGo(event,'features')">Features</a><a href="#how" onclick="lpGo(event,'how')">How it works</a><a href="#formats" onclick="lpGo(event,'formats')">Formats</a></div>
+ <span class="lp-sp"></span>
+ <button class="btn go" onclick="startDemo()">▶ Try Live Demo</button>
+ <span id="navAuth" class="lp-auth"></span>
+</nav>
+<div class="lp-hero">
+ <div class="lp-left">
+  <div class="lp-badge"><i></i>DataQuest 3.0 · DQCL ParseAnything · Team DEADLOCK</div>
+  <h1 class="lp-h1">Parse<span>Flow</span><br>reads any document.</h1>
+  <p class="lp-sub">Digital text, tables, scans, handwriting and equations → structured JSON + Markdown, with the evidence behind every block.</p>
+  <div class="lp-up">
+   <div class="lp-uprow"><button class="btn go lp-big" onclick="fi.click()">⬆ Upload document</button><button class="btn lp-big2" onclick="fi.click()">Browse files</button></div>
+   <div class="lp-opts" id="lpOpts"></div>
+   <div class="lp-fmts"><span>PDF</span><span>PNG</span><span>JPG</span><span>JPEG</span><em id="lpLim">· up to 300 MB · 1000 pages</em></div>
+  </div>
+  <input id="fi" type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.json" onchange="onFile(this.files[0]);this.value=''">
+  <div id="uerr"></div>
+ </div>
+ <div class="lp-right">
+  <div class="lp-banner" id="banner" onmouseenter="bnPause(true)" onmouseleave="bnPause(false)">
+   <div class="bn-h"><span class="bn-live"><i></i>FEATURE TOUR</span><span class="bn-mu">·</span><span id="bnCount" class="bn-mu"></span><span class="lp-sp"></span><span class="mono bn-mu" id="bnFile"></span></div>
+   <div class="bn-slide" id="bnSlide"></div>
+   <div class="bn-f"><button class="bn-arrow" onclick="bnGo(BN-1)" aria-label="Previous">‹</button><div class="bn-dots" id="bnDots"></div><button class="bn-arrow" onclick="bnGo(BN+1)" aria-label="Next">›</button>
+    <span class="bn-labels" id="bnLabels"></span><span class="lp-sp"></span><button class="btn sm" onclick="startDemo()">Open full demo →</button></div>
+  </div>
+ </div>
+</div>
+<div class="lp-ticker"><div class="lp-track" id="lpTrack"></div></div>
+</div>
+
+<div class="lp-sec" id="features">
+ <div class="lp-eye">What ParseFlow does</div>
+ <h2 class="lp-h2">One upload. Every kind of content.</h2>
+ <p class="lp-lead">ParseFlow looks at each region of a page and sends it to the extractor that fits — then tells you how sure it is and where the result came from.</p>
+ <div class="lp-grid3">
+  <div class="lp-card"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M4 6h7M4 10h7M4 14h7M13 6h7M13 10h7M13 14h7"/></svg></div><h4>Layout that reads like a person</h4><p>Multi-column articles, sidebars and drop caps in the right order; running headers and page numbers set aside.</p></div>
+  <div class="lp-card"><div class="lp-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></div><h4>Tables with real structure</h4><p>Ruled, borderless and booktabs tables, merged cells, rotated headers — Markdown or HTML output.</p></div>
+  <div class="lp-card"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M5 7h6l-4 5 4 5H5M14 9l5 6M19 9l-5 6"/></svg></div><h4>Equations as LaTeX</h4><p>Fractions, sums with limits, sub- and superscripts rebuilt from the PDF itself — and rendered as real maths.</p></div>
+  <div class="lp-card"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/><path d="M15 15l4 4"/></svg></div><h4>Scans &amp; handwriting</h4><p>Adaptive OCR for faded, skewed, noisy pages; handwriting and diagrams via an optional vision model.</p></div>
+  <div class="lp-card"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/></svg></div><h4>Ask your document</h4><p>Questions answered with passages copied from the document, each with a View Source link — nothing generated.</p></div>
+  <div class="lp-card"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div><h4>Flags instead of guesses</h4><p>Unreadable regions are preserved and marked for review — nothing is invented to look complete.</p></div>
+ </div>
+</div>
+
+<div class="lp-sec" id="how">
+ <div class="lp-eye">How it works</div>
+ <h2 class="lp-h2">Seven stages, all visible.</h2>
+ <p class="lp-lead">The same stages you see while a document is processing. Long reports are handled a slice of pages at a time, so a 400-page file works on an ordinary laptop.</p>
+ <div class="lp-pipe" id="lpPipe"></div>
+</div>
+
+<div class="lp-sec" id="formats">
+ <div class="lp-eye">Try it on your own file</div>
+ <h2 class="lp-h2">Drop a document</h2>
+ <div class="lp-drop" id="drop" onclick="fi.click()">
+  <div class="lp-dropic"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
+  <h3>Drag &amp; drop your file here</h3>
+  <p>or <u>browse from your computer</u></p>
+  <div class="lp-fmt"><span>.pdf</span><span>.png</span><span>.jpg</span><span>.jpeg</span><span class="lp-fmt2">ParseFlow .json</span></div>
+  <div class="lp-dropbtns" id="lpDropBtns" onclick="event.stopPropagation()"></div>
+  <div class="lp-note" id="lpNote"></div>
+ </div>
+</div>
+
+<footer class="lp-foot"><span class="lp-logo sm"><svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="7" fill="url(#pfg)"/><path d="M10 9h8a4 4 0 010 8h-8M10 9v14M20 20l3 3 4-5" stroke="#0a0b0d" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>ParseFlow</span><span>Team DEADLOCK · DataQuest 3.0</span><span class="lp-sp"></span><span id="beb" class="cap"><i></i>checking backend…</span><a href="https://github.com/ADII6769/PARSERFLOWS" target="_blank" rel="noopener">GitHub</a></footer>
+</section>
+
+<section id="ws" class="wsv">
+<aside class="ws-side">
+ <a class="lp-logo" href="#" onclick="event.preventDefault();wsNav('docs')"><svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="7" fill="url(#pfg)"/><path d="M10 9h8a4 4 0 010 8h-8M10 9v14M20 20l3 3 4-5" stroke="#0a0b0d" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>ParseFlow</a>
+ <button class="btn go ws-upbtn" onclick="fi.click()">＋ Upload new document</button>
+ <div class="ws-nav" id="wsNav"></div>
+ <div class="ws-lab">Recent</div>
+ <div class="ws-nav ws-recent" id="wsRecent"></div>
+ <div class="ws-lab">Account</div>
+ <div class="ws-nav" id="wsAcct"></div>
+ <span class="lp-sp"></span>
+ <div class="ws-store" id="wsStore"></div>
+ <div class="ws-me" id="wsMe"></div>
+</aside>
+<main class="ws-main">
+ <header class="ws-head"><label class="ws-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="wsQ" placeholder="Search your documents by name…" oninput="WSQ=this.value;renderWsBody()"></label><span class="lp-sp"></span><span id="beb3" class="cap"></span><button class="btn" onclick="startDemo()">▶ Try Live Demo</button></header>
+ <div id="wserr"></div>
+ <div class="ws-body" id="wsBody"></div>
+</main>
+</section>
+
+<div class="md-back" id="mdBack" onclick="if(event.target==this)mdClose()"><div class="md-box" id="mdBox" role="dialog" aria-modal="true"></div></div>
 
 <section id="procv" class="view"><div class="proc"><h2 style="margin:0 0 14px">Processing</h2><div class="pcard"><div id="pfile"></div><div class="up"><i id="upb"></i></div></div><div id="stages"></div></div></section>
 
-<section id="app" class="app"><div class="top"><div class="logo"><svg viewBox="0 0 32 32"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ea8fe"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="7" fill="url(#lg)"/><path d="M10 9h8a4 4 0 010 8h-8M10 9v14M20 20l3 3 4-5" stroke="#0a0b0d" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>ParseFlow</div><span class="fn" id="fname"></span><span class="demo" id="demob">DEMO · synthetic sample document</span><span style="flex:1"></span><span id="beb2" class="cap"></span><button class="btn sm go" onclick="DOC.demo?tourGo(0):present()">▶ Present</button> <button class="btn sm" onclick="tourEnd();show('landing')">New document</button></div>
+<section id="app" class="app"><div class="top"><div class="logo"><svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="7" fill="url(#pfg)"/><path d="M10 9h8a4 4 0 010 8h-8M10 9v14M20 20l3 3 4-5" stroke="#0a0b0d" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>ParseFlow</div><span class="fn" id="fname"></span><span class="demo" id="demob">DEMO · synthetic sample document</span><span style="flex:1"></span><span id="beb2" class="cap"></span><button class="btn sm go" onclick="DOC.demo?tourGo(0):present()">▶ Present</button> <button class="btn sm" onclick="goHome()">New document</button></div>
 <div class="main"><div class="thumbs" id="thumbs"></div><div class="vw"><div class="bar"><span id="pginfo"></span><span style="flex:1"></span><label><input type="checkbox" id="ovt" checked onchange="renderPage()"> Region overlays</label></div><div class="page" id="page"></div></div>
 <div class="rt"><div class="tabs" id="tabs"></div><div class="pane" id="pane"></div></div></div></section>
 
@@ -131,9 +341,6 @@ B('eq_2_01','equation',2,[40,430,400,490],5,.88,'model','math_vision','BF = h(L)
 B('hand_2_03','handwritten_text',2,[40,520,560,640],6,.41,'model','vision_handwriting',null,{warnings:['Low confidence — review source. Content withheld rather than guessed.']}),
 B('hand_2_04','handwritten_text',2,[40,670,560,740],7,.83,'model','vision_handwriting','|BF| > 1  =>  rebalance')]};
 DOC=DEMO;DOC.blocks.forEach(b=>{if(b.verification!=='verified'&&!b.warnings.length)b.warnings.push('Confidence below verification threshold (0.85) — review recommended.')});
-function showcase(){const bl=DEMO.blocks.filter(b=>b.page==2);let i=0;const hl=t=>esc(t).replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(-?\d+\.?\d*)\b/g,(m,a,c,n)=>a?(c?`<span class="js-k">${a}</span>${c}`:`<span class="js-s">${a}</span>`):`<span class="js-n">${n}</span>`);
-const draw=()=>{const c=bl[i%bl.length];i++;$('mockl').innerHTML=demoSVG(2).replace('</svg>','')+bl.map(b=>`<rect x="${b.bbox[0]}" y="${b.bbox[1]}" width="${b.bbox[2]-b.bbox[0]}" height="${b.bbox[3]-b.bbox[1]}" fill="${COL[b.verification]}${b==c?'44':'14'}" stroke="${COL[b.verification]}" stroke-width="${b==c?6:2}"/>`).join('')+'</svg>';$('mkid').textContent=c.block_id;
-const o={block_id:c.block_id,type:c.type,page:c.page,bbox:c.bbox,confidence:c.confidence,confidence_type:c.confidence_type,extractor:c.extractor,verification:c.verification,content:c.content};$('mockj').innerHTML=hl(JSON.stringify(o,null,2))};draw();setInterval(draw,2600)}
 let sel=null,pg=1,tab='Inspector',flt='All',aq=[];
 function warnHTML(){const sample=DOC.local&&DOC.blocks.some(b=>b.extractor=='fallback')?`<div style="margin:8px 0"><button class="btn sm go" onclick="present()">▶ See a sample handwritten-page result (demo, not your file)</button></div>`:'';const w=[...(DOC.warnings||[])],f=DOC.blocks.filter(b=>b.verification!='verified');return `<h3 style="margin:18px 0 6px">Warnings</h3>`+(w.length||f.length?w.map(x=>`<div class="warn">${esc(x)}</div>`).join('')+(f.length?`<div class="warn">${f.length} block${f.length>1?'s':''} flagged for review — see Blocks → Warning.</div>`:''):'<div style="color:var(--ok)">✓ No warnings</div>')+sample}
 const TABS=['Inspector','Overview','Blocks','Tables','Visuals','Handwritten','JSON','Markdown','Ask'];
@@ -241,7 +448,7 @@ else if(tab=='JSON'){p.innerHTML=`<div style="display:flex;gap:6px;margin-bottom
 else if(tab=='Markdown'){const be=DOC.markdown!=null;p.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap"><button class="btn sm" onclick="navigator.clipboard.writeText(mdText())">Copy</button><button class="btn sm" onclick="dl('parseflow.md',mdText(),'text/markdown')">Download</button>${be?`<label style="font-size:12px;color:var(--mu)"><input type="checkbox" ${MDF?'checked':''} onchange="toggleFurniture(this.checked)"> include running headers/footers</label>`:''}</div><div style="font-size:11px;color:var(--mu);margin-bottom:6px">${be?'Canonical Markdown generated by the ParseFlow backend (tables with merged cells are HTML; equations are LaTeX).':'Markdown generated in the browser (demo / browser mode).'}</div><pre>${esc(mdText())}</pre>`}
 else{p.innerHTML=`<h3 style="margin:0 0 8px">Ask Your Document</h3><div class="ask"><input id="qi" placeholder="${SRV()?'e.g. What does page 1 explain?':'e.g. What rotation is shown in the diagram?'}" onkeydown="if(event.key=='Enter'&&this.value.trim())answerQ(this.value)"><button class="btn" onclick="qi.value.trim()&&answerQ(qi.value)">Ask</button></div><div class="chips">${askChips().map(q=>`<button onclick="answerQ(this.textContent)">${esc(q)}</button>`).join('')}</div>`+aq.map(it=>it.r===undefined?srvCard(it):`<div class="card" style="margin-bottom:10px"><div style="color:var(--mu);font-size:12px">${esc(it.q)}</div>${it.r?`<div class="k">Answer</div>${esc(it.r.ans)}<div class="k">Confidence</div>${(it.r.conf*100|0)}% <span style="color:var(--mu)">(lowest evidence block, ${'estimated'})</span><div class="k">Evidence</div>${it.r.top.map(b=>`<div class="flow" style="margin:3px 0"><span class="mono">p${b.page} · ${b.block_id}</span><button class="btn sm" onclick="source('${b.block_id}')">View Source</button></div>`).join('')}`:`<p style="margin:6px 0 0">I couldn't confidently verify this from the document.</p>`}</div>`).join('')+`<p style="color:var(--mu);font-size:12px">${SRV()?'Answers are copied from the extracted blocks (keyword, heading and table matching) with their source regions — no external model, nothing generated.':'Answers use keyword retrieval over the extracted blocks only — no external model.'}</p>`}if(['Ask','Inspector','Blocks','Tables','Visuals'].includes(tab))mathIn(p)}
 function dl(n,t,m){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:m}));a.download=n;a.click()}
-function show(v){['landing','procv','app'].forEach(i=>$(i).classList.toggle('on',i==v))}
+function show(v){['landing','procv','app','ws'].forEach(i=>$(i).classList.toggle('on',i==v));if(v!='landing')clearTimeout(BNT);if(v!='ws')clearTimeout(WSPOLL)}
 const STG=[['DETECT','Document detected'],['ANALYZE','Pages and regions identified'],['ROUTE','Content regions classified'],['EXTRACT','Extracting content'],['ASSEMBLE','Reconstructing document'],['VERIFY','Checking evidence'],['OUTPUT','Generating Markdown + JSON']];
 /*PB*/
 function pdfBlocks(items,W,H){ // items: [{s,x,y,h,w}] in page pixels (y = baseline). Pure function.
@@ -302,18 +509,19 @@ function run(name,meta){show('procv');fileCard(name,meta);$('upb').style.width='
 const t=setInterval(()=>{i++;drawStages(l());if(i>=STG.length){clearInterval(t);setTimeout(open,350)}},380)}
 function open(){sel=null;pg=1;tab='Overview';aq=[];LIM={};MDF=false;MDX=null;$('fname').textContent=DOC.filename;$('demob').style.display=DOC.demo?'':'none';show('app');renderPage();renderTabs();capBadge();if(AUTO){AUTO=false;setTimeout(()=>tourGo(0),600)}}
 function startDemo(){DOC=DEMO;run('demo_mixed_document.pdf',['PDF (synthetic)','2 pages','demo sample'])}
-function fail(code,t,m){show('landing');$('uerr').innerHTML=`<div class="err"><b class="mono">${code}</b> · ${t}<div style="color:var(--mu);margin-top:4px">${m}</div>${code=='PF-501'?'<div style="margin-top:8px"><button class="btn sm" onclick="startDemo()">Open the demo document instead</button></div>':''}</div>`}
-function capBadge(){const t=BE?`<i></i>Backend online · OCR ${BE.ocr?'Tesseract':'unavailable'} · Vision ${BE.vision.configured?BE.vision.model:'not configured'}`:'<i></i>Browser mode · vision via Claude (asks consent) · OCR needs server';['beb','beb2'].forEach(i=>{const e=$(i);if(e){e.innerHTML=t;e.className='cap '+(BE?'on':'off')}})}
-fetch('/api/health').then(r=>r.json()).then(h=>{if(h&&h.ok)BE=h}).catch(()=>{}).finally(capBadge);
+function fail(code,t,m){const W=!!ME;if(W){show('ws');renderWs()}else show('landing');$(W?'wserr':'uerr').innerHTML=`<div class="err"><b class="mono">${code}</b> · ${t}<div style="color:var(--mu);margin-top:4px">${m}</div>${code=='PF-501'?'<div style="margin-top:8px"><button class="btn sm" onclick="startDemo()">Open the demo document instead</button></div>':''}</div>`}
+function capBadge(){const t=BE?`<i></i>Backend online · OCR ${BE.ocr?'Tesseract':'unavailable'} · Vision ${BE.vision.configured?BE.vision.model:'not configured'}`:'<i></i>Browser mode · vision via Claude (asks consent) · OCR needs server';['beb','beb2','beb3'].forEach(i=>{const e=$(i);if(e){e.innerHTML=t;e.className='cap '+(BE?'on':'off')}})}
+fetch('/api/health').then(r=>r.json()).then(h=>{if(h&&h.ok)BE=h}).catch(()=>{}).finally(()=>{capBadge();(BE?refreshMe():Promise.resolve()).then(()=>{lpAuth();if(ME&&$('landing').classList.contains('on'))goWs()})});
 function upload(f,ext,sz){show('procv');fileCard(f.name,[ext.toUpperCase(),sz,'uploading…']);$('upb').style.width='0';drawStages(STG.map(s=>({name:s[0],detail:'',state:'pending'})));
 const fd=new FormData();fd.append('file',f);const x=new XMLHttpRequest();x.open('POST','/api/process');
 x.upload.onprogress=e=>{if(e.lengthComputable)$('upb').style.width=(e.loaded/e.total*100)+'%'};
 x.onerror=()=>fail('PF-501','Backend unreachable','The ParseFlow server did not respond. Start it with ./run.sh.');
 x.onload=()=>{let j;try{j=JSON.parse(x.responseText)}catch(e){return fail('PF-500','Server Error','The server returned an unexpected response.')}
-if(j.error)return fail(j.error.code,j.error.title,j.error.message);$('upb').style.width='100%';fileCard(j.filename,[j.type,sz,j.pages+' page'+(j.pages>1?'s':'')]);
+if(j.error)return fail(j.error.code,j.error.title,j.error.message);track(j,sz)};x.send(fd)}
+function track(j,sz){show('procv');$('upb').style.width='100%';fileCard(j.filename,[j.type,sz,j.pages+' page'+(j.pages>1?'s':'')]);clearInterval(poll);
 poll=setInterval(()=>fetch('/api/status/'+j.document_id).then(r=>r.json()).then(st=>{if(st.error&&!st.stages)return;drawStages(st.stages);
 if(st.status=='failed'){clearInterval(poll);fail(st.error.code,st.error.title,st.error.message)}
-if(st.status=='complete'){clearInterval(poll);fetch('/api/document/'+j.document_id).then(r=>r.json()).then(d=>{DOC=d;setTimeout(open,400)}).catch(()=>fail('PF-500','Server Error','Could not load the processed document.'))}}).catch(()=>{clearInterval(poll);fail('PF-501','Backend unreachable','Lost connection to the ParseFlow server.')}),450)};x.send(fd)}
+if(st.status=='complete'){clearInterval(poll);fetch('/api/document/'+j.document_id).then(r=>r.json()).then(d=>{DOC=d;if(j.filename)DOC.filename=j.filename;setTimeout(open,400)}).catch(()=>fail('PF-500','Server Error','Could not load the processed document.'))}}).catch(()=>{clearInterval(poll);fail('PF-501','Backend unreachable','Lost connection to the ParseFlow server.')}),450)}
 
 function loadPdfJs(){return PJ||(PJ=new Promise((ok,no)=>{if(window.pdfjsLib)return ok(window.pdfjsLib);const e=document.createElement('script');e.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';e.onload=()=>{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';ok(pdfjsLib)};e.onerror=()=>{PJ=null;no(new Error('load'))};document.head.appendChild(e)}))}
 const FLAG_MSG='No text layer on this page (scanned, photographed or handwritten). OCR, handwriting and diagram extraction need the ParseFlow server; the page image is preserved and flagged instead of guessed.';
@@ -388,12 +596,149 @@ async function localProcess(f,ext,sz){show('procv');fileCard(f.name,[ext.toUpper
    stats:{pages:pages.length,blocks:blocks.length,tables:blocks.filter(b=>b.type=='table').length,visuals:blocks.filter(b=>vis.includes(b.type)).length,verified:blocks.length-fl,flagged:fl,lanes:{local:pg.filter(p=>!p.need).length,ocr:0,vision:okV,flagged:blocks.filter(b=>b.extractor=='fallback').length}},engines:{ocr:null,vision:{configured:canV&&okV>0,provider:'Claude (artifact sample)'}}};
   det(6,'Markdown + JSON ready');drawStages(st.map(x=>({...x,state:'done'})));setTimeout(open,500)}
  catch(e){fail('PF-500','Processing Error','Browser-mode processing failed ('+(e&&(e.name||e.code)||'error')+'). Try again, use the demo, or run the full server.')}}
-function onFile(f){if(!f)return;$('uerr').innerHTML='';const ext=(f.name.split('.').pop()||'').toLowerCase(),sz=f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024|0)+' KB';
+function onFile(f){if(!f)return;$('uerr').innerHTML='';$('wserr').innerHTML='';const ext=(f.name.split('.').pop()||'').toLowerCase(),sz=f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024|0)+' KB';
 if(!['pdf','png','jpg','jpeg','json'].includes(ext))return fail('PF-204','Unsupported Document','ParseFlow could not process this file type. Supported: PDF, PNG, JPG/JPEG.');
 if(!f.size)return fail('PF-205','Empty Document','The file contains no data.');
 {const lim=BE&&BE.max_upload_mb?BE.max_upload_mb:50;if(f.size>lim*1048576)return fail('PF-206','File Too Large','Maximum size is '+lim+' MB.');}
 if(ext=='json'){f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.blocks)||!Array.isArray(d.pages))throw 0;d.blocks.forEach(b=>{if(!b.block_id||!Array.isArray(b.bbox)||!b.page)throw 0});d.demo=false;d.real=!!d.real;DOC=d;run(f.name,['Digital Twin JSON',sz,d.pages.length+' pages'])}catch(e){fail('PF-203','Invalid Digital Twin','File is not a valid ParseFlow document (needs pages[] and blocks[] with block_id, page, bbox).')}});return}
 if(!BE)return localProcess(f,ext,sz);
 upload(f,ext,sz)}
-const dz=$('drop');['dragover','dragenter'].forEach(e=>document.addEventListener(e,x=>{x.preventDefault();dz.classList.add('hv')}));['dragleave','drop'].forEach(e=>document.addEventListener(e,x=>{x.preventDefault();dz.classList.remove('hv');if(e=='drop')onFile(x.dataTransfer.files[0])}));
-showcase();</script></body></html>
+const dzs=()=>[$('drop'),$('wsdrop')].filter(Boolean);['dragover','dragenter'].forEach(e=>document.addEventListener(e,x=>{x.preventDefault();dzs().forEach(d=>d.classList.add('hv'))}));['dragleave','drop'].forEach(e=>document.addEventListener(e,x=>{x.preventDefault();dzs().forEach(d=>d.classList.remove('hv'));if(e=='drop')onFile(x.dataTransfer.files[0])}));
+/* ---------------- landing: feature banner, ticker, sections (v2.1) ---------------- */
+const L=(w,h)=>`<div class="ln" style="width:${w||100}%${h?';height:'+h+'px':''}"></div>`,Ls=(n,ws)=>Array.from({length:n},(_,i)=>L(ws?ws[i%ws.length]:[100,96,92,98,88][i%5])).join('');
+const HL=(x,y,w,h,c,tag,tc,tx,ty)=>`<div class="hl ${c||''}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%"></div>`+(tag?`<div class="hl-tag ${tc||''}" style="left:${tx??x}%;top:calc(${ty??y}% - 17px)">${tag}</div>`:'');
+const JS=o=>esc(JSON.stringify(o).replace(/,(?=")/g,', ').replace(/":/g,'": ')).replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(-?\d+\.?\d*)\b/g,(m,a,c,n)=>a?(c?`<span class="js-k">${a}</span>${c}`:`<span class="js-s">${a}</span>`):`<span class="js-n">${n}</span>`);
+const SLIDES=[
+ {k:'Text & columns',f:'research_paper.pdf · page 3',t:'Columns read in the right order',d:'Two-column pages, sidebars and drop caps come out as a person reads them — not line by line across the gutter.',
+  p:()=>L(62,9)+`<div class="bn-cols"><div>${Ls(13)}</div><div>${Ls(13,[100,94,97,90])}</div></div>`+HL(5,13,44,80,'sel','① left column')+HL(51,13,44,80,'','② right column','g',51),
+  o:()=>`<div class="bn-k">Markdown · reading order</div><pre>## 3 Method
+
+The left column is read to the end first,
+then the right column continues the text…
+
+<span class="js-k">&lt;!-- block txt_3_04 · p3 · reading order 4 --&gt;</span></pre><div class="bn-k">Detected</div><span class="bn-chip"><b>2</b> columns</span><span class="bn-chip">gutter at <b>49%</b></span><span class="bn-chip">hyphenation <b>repaired</b></span>`},
+ {k:'Headers/footers',f:'journal_article.pdf · page 12',t:'Running headers set aside',d:'Journal names, page numbers and download stamps are recognised across pages — kept in the JSON, left out of the Markdown.',
+  p:()=>`<div style="font:9px sans-serif;color:#777;display:flex;justify-content:space-between"><span>Journal of Applied Things · Vol. 4</span><span>2025</span></div><div style="height:14px"></div>`+L(70,9)+Ls(14)+`<div style="position:absolute;bottom:14px;left:0;right:0;text-align:center;font:9px sans-serif;color:#777">— 12 —</div>`+HL(3,2,94,7,'w','header','w',3,14)+HL(42,90,16,7,'w','page number','w',38,90),
+  o:()=>`<div class="bn-k">Why they were set aside</div><div class="bn-step"><i>●</i><span><b>“Journal of Applied Things · Vol. 4”</b> — top band · repeats on 23 pages · journal pattern</span></div><div class="bn-step"><i>●</i><span><b>“— 12 —”</b> — bottom edge · page-number pattern</span></div><div class="bn-k">Kept in the JSON</div><pre>${JS({block_id:'hdr_12_01',role:'header',furniture:{score:2.05,excluded:true}})}</pre><div class="bn-d" style="margin-top:8px">One click (“include running headers”) puts them back in the Markdown.</div>`},
+ {k:'Tables',f:'annual_report.pdf · page 1',t:'Tables keep their structure',d:'Merged header cells become real colspan — nothing is flattened or invented.',
+  p:()=>L(70,9)+Ls(3)+`<div class="bn-tbl"><div class="h"><span></span><span style="grid-column:span 2"></span><span></span></div><div class="h"><span style="opacity:0"></span><span></span><span></span><span></span></div>${'<div><span></span><span></span><span></span><span></span></div>'.repeat(4)}</div>`+Ls(4)+HL(4,24,92,30,'sel','table · 94%'),
+  o:()=>`<div class="bn-k">Extracted table <span class="pill verified">Verified · ruled grid</span></div><table class="t"><tr><th>Region</th><th colspan="2" style="text-align:center">Revenue ($M)</th><th>Δ</th></tr><tr><th></th><th>FY23</th><th>FY24</th><th></th></tr><tr><td>Americas</td><td>18.0</td><td>19.1</td><td>+6%</td></tr><tr><td>Europe</td><td>11.2</td><td>11.2</td><td>0%</td></tr><tr><td>APAC</td><td>14.4</td><td>17.9</td><td>+24%</td></tr></table><div class="bn-k">Evidence</div><pre>${JS({block_id:'tbl_1_01',page:1,bbox:[40,200,560,330],extractor:'table_engine'})}</pre>`},
+ {k:'Equations',f:'physics_notes.pdf · page 7',t:'Equations become LaTeX',d:'Rebuilt from the glyphs in the PDF — fractions, roots, limits, sub- and superscripts — and shown as real maths.',
+  p:()=>L(60,9)+Ls(4)+`<div style="text-align:center;margin:16px 0;font:italic 19px 'Times New Roman',serif;color:#111">∂<b>B</b>/∂t = −∇ × <b>E</b></div>`+Ls(3)+`<div style="text-align:center;margin:14px 0;font:italic 17px 'Times New Roman',serif;color:#111">∫ Ψ*Ψ dv = 1</div>`+Ls(3)+HL(16,24,68,11,'sel','equation · 97%'),
+  o:()=>`<div class="bn-k">Rendered</div><div class="amr" style="font-size:17px">\\[\\frac{\\partial \\mathbf{B}}{\\partial t} = -\\nabla \\times \\mathbf{E}\\]</div><div class="bn-k">LaTeX</div><pre>\\frac{\\partial \\mathbf{B}}{\\partial t} = -\\nabla \\times \\mathbf{E}</pre><div class="bn-d" style="margin-top:8px">Inline maths stays inline: \\(\\int \\Psi^{*}\\Psi \\, dv = 1\\)</div>`},
+ {k:'Scans & OCR',f:'letter_1864.pdf · scanned',t:'Old scans, read adaptively',d:'ParseFlow measures each scan — contrast, skew, speckle, text size — and only applies the clean-up steps the page needs.',
+  p:()=>`<div class="bn-scan" style="position:absolute;inset:16px;padding:16px;border-radius:2px">`+L(55,9)+Ls(15,[96,90,99,84,93])+`</div>`+HL(6,14,88,46,'sel','ocr · 91%'),
+  o:()=>`<div class="bn-k">Measured on this page</div><span class="bn-chip">contrast <b>low</b></span><span class="bn-chip">skew <b>1.8°</b></span><span class="bn-chip">speckle <b>medium</b></span><div class="bn-k">Applied</div><div class="bn-step"><i>✓</i><b>Contrast stretch</b></div><div class="bn-step"><i>✓</i><b>Deskew</b> by measured angle</div><div class="bn-step"><i>✓</i><b>Sauvola binarisation</b> for uneven paper</div><div class="bn-step"><i>✓</i>Kept the better of two attempts (Tesseract confidence)</div><div class="bn-d" style="margin-top:8px">Pages with a usable text layer skip OCR entirely.</div>`},
+ {k:'Ask',f:'deBroglie_wavefunction.pdf',t:'Ask your document',d:'Answers are copied from the extracted blocks — with the maths rendered and a View Source link to the exact region.',
+  p:()=>`<div style="text-align:center;font:600 13px sans-serif;color:#c00;margin-bottom:8px">Normalization of Wavefunction</div>`+Ls(6)+`<div style="height:20px"></div>`+Ls(2)+`<div style="margin-top:14px;font:italic 10.5px 'Times New Roman',serif;color:#111;white-space:nowrap">∫ Ψ*Ψ dv = 1,&nbsp; 1/√N is called normalization factor.</div>`+Ls(3)+HL(3,46,94,7,'sel','evidence · p13'),
+  o:()=>`<div class="bn-q">What is the normalization factor?</div><div class="bn-a">\\(\\int \\Psi^{*}\\Psi \\, dv = 1\\), \\(1/\\sqrt{N}\\) is called normalization factor.</div><div class="bn-k">Evidence</div><div class="flow"><span class="mono">p13 · txt_13_07</span><button class="btn sm" tabindex="-1">View Source</button></div><div class="bn-k">How</div><span class="bn-chip">section · passage · table cell</span><span class="bn-chip"><b>no model</b> — nothing generated</span>`},
+ {k:'Flags, not guesses',f:'lab_whiteboard.jpg',t:'Flags instead of guesses',d:'When handwriting is unreadable, ParseFlow keeps the image region and marks it for review rather than inventing text.',
+  p:()=>`<div class="bn-hand" style="margin-top:22px">AVL Tree — Deletion</div><div class="bn-hand" style="font-size:18px;margin-top:10px">BF = h(L) − h(R)</div><div class="bn-hand" style="font-size:17px;margin-top:40px;opacity:.6;filter:blur(1.2px)">if lft rot thn ckk paremt bf…</div><div class="bn-hand" style="font-size:18px;margin-top:40px">|BF| &gt; 1 ⇒ rebalance</div>`+HL(3,9,80,10,'','verified','g')+HL(3,37,94,10,'e','flagged · 41%','e'),
+  o:()=>`<div class="bn-k">Region hand_2_03 <span class="pill failed">Flagged</span></div><div class="warn">Low confidence — content withheld rather than guessed. The image region is preserved; open View Source to read it yourself.</div><pre>${JS({block_id:'hand_2_03',content:null,confidence:0.41,verification:'failed',preserved_image:true})}</pre>`}
+];
+let BN=0,BNT=null,BNP=false;const BN_MS=5500;
+function bnRender(){const s=SLIDES[BN];$('bnSlide').innerHTML=`<div class="bn-doc"><div class="bn-paper">${s.p()}</div></div><div class="bn-out"><h3>${s.t}</h3><div class="bn-d">${s.d}</div>${s.o()}</div>`;
+ $('bnCount').textContent=`Slide ${BN+1} of ${SLIDES.length} — ${s.k}`;$('bnFile').textContent=s.f+' · sample';
+ $('bnDots').innerHTML=SLIDES.map((x,i)=>`<button class="${i<BN?'done':i==BN?'on':''}" onclick="bnGo(${i})" aria-label="${esc(x.k)}"></button>`).join('');
+ const nx=SLIDES[(BN+1)%SLIDES.length];$('bnLabels').innerHTML=`<b>${esc(s.k)}</b> · next: <span onclick="bnGo(${(BN+1)%SLIDES.length})">${esc(nx.k)}</span>`;
+ if(/\\\(|\\\[/.test($('bnSlide').textContent))mathIn($('bnSlide'))}
+function bnGo(i){BN=(i+SLIDES.length)%SLIDES.length;bnRender();bnArm()}
+function bnArm(){clearTimeout(BNT);if(!BNP&&$('landing').classList.contains('on'))BNT=setTimeout(()=>bnGo(BN+1),BN_MS)}
+function bnPause(p){BNP=p;$('banner').classList.toggle('paused',p);if(p)clearTimeout(BNT);else{bnArm()}}
+document.documentElement.style.setProperty('--bnt',BN_MS/1000+'s');
+const TICK=['<b>Column-aware</b> reading order','<b>Running headers</b> removed, kept in JSON','<b>LaTeX</b> from PDF maths','<b>Merged cells</b> → HTML tables','<b>Adaptive OCR</b> for old scans','<b>Evidence</b> on every block','<b>Ask</b> with View Source','<b>400-page</b> reports','<b>Offline</b> · no API key needed','<b>Markdown + JSON</b> export'];
+const HOW=[['DETECT','file type, pages, text layer'],['ANALYZE','regions, columns, tables, maths'],['ROUTE','best extractor per page'],['EXTRACT','text · tables · LaTeX · OCR'],['ASSEMBLE','reading order, headers set aside'],['VERIFY','independent evidence per block'],['OUTPUT','Markdown + Digital Twin JSON']];
+function lpInit(){$('lpTrack').innerHTML=(TICK.map(t=>`<span>${t}</span>`).join('')).repeat(2);
+ $('lpPipe').innerHTML=HOW.map((h,i)=>`<div class="s" style="animation-delay:${i*1.5}s"><b>${h[0]}</b><small>${h[1]}</small></div>`).join('');bnRender();bnArm();lpAuth()}
+function lpGo(e,id){e.preventDefault();const t=$(id);if(t)t.scrollIntoView({behavior:'smooth',block:'start'})}
+function lpTop(e){e.preventDefault();$('landing').scrollTo({top:0,behavior:'smooth'})}
+const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';
+function lpAuth(){const lim=BE?`· up to ${BE.max_upload_mb} MB · ${BE.max_pages} pages`:'';$('lpLim').textContent=lim;
+ if(ME){$('navAuth').innerHTML=`<button class="btn" onclick="goWs()">My documents</button><button class="av" title="${esc(ME.name)} · ${esc(ME.email)}" onclick="goWs('settings')" style="border:0">${esc(initials(ME.name))}</button>`;
+  $('lpOpts').innerHTML=`<div class="lp-opt on" style="grid-column:span 2"><b>✓ Saving to your library</b>Logged in as ${esc(ME.name)} — uploads are kept in My documents until you delete them.</div>`;
+  $('lpDropBtns').innerHTML=`<button class="btn go" onclick="fi.click()">Upload to my library</button><button class="btn" onclick="goWs()">Open my documents</button>`}
+ else{$('navAuth').innerHTML=`<button class="btn ghost" onclick="openAuth('login')">Log in</button><button class="btn pri" onclick="openAuth('signup')">Sign up</button>`;
+  $('lpOpts').innerHTML=`<button class="lp-opt on" onclick="fi.click()"><b>✓ Continue without account</b>Process now · results are <u>not saved</u> after you leave</button><button class="lp-opt" onclick="openAuth('login','upload')"><b>🔒 Log in to save</b>Keep every upload in your library and reopen it anytime</button>`;
+  $('lpDropBtns').innerHTML=`<button class="btn go" onclick="fi.click()">Process without saving</button><button class="btn" onclick="openAuth('login','upload')">🔒 Log in to save to your library</button>`}
+ $('lpNote').textContent=(BE?`Max ${BE.max_upload_mb} MB · up to ${BE.max_pages} pages · `:'')+(ME?'Saved to your library on this ParseFlow server.':'Processed on this ParseFlow server · guest uploads are deleted after 24 hours.')}
+
+/* ---------------- accounts ---------------- */
+let ME=null,PEND=null,AUTHM='login';
+const api=(u,o={})=>fetch(u,{credentials:'same-origin',...o,headers:{'Content-Type':'application/json',...(o.headers||{})}}).then(async r=>{let j={};try{j=await r.json()}catch(e){}if(!r.ok||j.error)throw new Error((j.error&&j.error.message)||('Request failed ('+r.status+')'));return j});
+function refreshMe(){return fetch('/api/auth/me',{credentials:'same-origin'}).then(r=>r.json()).then(j=>{ME=j.user||null}).catch(()=>{ME=null})}
+function mdOpen(html){$('mdBox').innerHTML=html;$('mdBack').classList.add('on');const f=$('mdBox').querySelector('input');f&&setTimeout(()=>f.focus(),30)}
+function mdClose(){$('mdBack').classList.remove('on');PEND=null}
+document.addEventListener('keydown',e=>{if(e.key=='Escape'&&$('mdBack').classList.contains('on'))mdClose()});
+function openAuth(mode,after){if(!BE)return fail('PF-501','Backend unreachable','Accounts need the ParseFlow server. Start it with ./run.sh.');AUTHM=mode||'login';PEND=after||null;authForm()}
+function authForm(err){const su=AUTHM=='signup';mdOpen(`<h3>${su?'Create your account':'Welcome back'}</h3><p class="sub">${su?'Save every document you upload and reopen it any time.':'Log in to see your saved documents.'}${PEND=='upload'?' After that, pick the file to upload.':''}</p>
+<div class="md-tabs"><button class="${su?'':'on'}" onclick="AUTHM='login';authForm()">Log in</button><button class="${su?'on':''}" onclick="AUTHM='signup';authForm()">Sign up</button></div>
+<form onsubmit="event.preventDefault();authSubmit(this)">${su?'<label class="fld"><span>Name</span><input name="name" autocomplete="name" required maxlength="80"></label>':''}
+<label class="fld"><span>Email</span><input name="email" type="email" autocomplete="email" required></label>
+<label class="fld"><span>Password${su?' (at least 8 characters)':''}</span><input name="password" type="password" autocomplete="${su?'new-password':'current-password'}" required ${su?'minlength="8"':''}></label>
+${err?`<div class="ermsg">${esc(err)}</div>`:''}<div class="md-acts"><button type="button" class="btn" onclick="mdClose()">Cancel</button><button class="btn go" type="submit">${su?'Create account':'Log in'}</button></div></form>
+<p class="sub" style="margin:14px 0 0;font-size:12px">Accounts live on this ParseFlow server only. Without an account, uploads are processed and then deleted after 24 hours.</p>`)}
+function authSubmit(f){const d=Object.fromEntries(new FormData(f).entries()),b=f.querySelector('button[type=submit]');b.disabled=true;
+ api('/api/auth/'+(AUTHM=='signup'?'signup':'login'),{method:'POST',body:JSON.stringify(d)}).then(j=>{ME=j.user;const after=PEND;PEND=null;$('mdBack').classList.remove('on');lpAuth();
+  if(after=='upload'){goWs();setTimeout(()=>fi.click(),50)}else goWs()}).catch(e=>{authForm(e.message);const m=$('mdBox').querySelector('[name=email]');if(m)m.value=d.email||'';const n=$('mdBox').querySelector('[name=name]');if(n)n.value=d.name||''})}
+function logout(){fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).finally(()=>{ME=null;LIB=[];WSSEL=null;lpAuth();show('landing')})}
+function dlg({title,text='',input=null,ok='OK',danger=false,password=false}){return new Promise(res=>{window._dlg=res;
+ mdOpen(`<h3>${esc(title)}</h3>${text?`<p class="sub">${esc(text)}</p>`:''}<form onsubmit="event.preventDefault();const i=this.querySelector('input');_dlg(i?i.value:true);mdClose()">${input!==null?`<label class="fld"><input ${password?'type="password" autocomplete="current-password"':''} value="${esc(input)}" required></label>`:''}<div class="md-acts"><button type="button" class="btn" onclick="_dlg(false);mdClose()">Cancel</button><button class="btn ${danger?'danger':'go'}" type="submit">${esc(ok)}</button></div></form>`)})}
+
+/* ---------------- workspace ---------------- */
+let LIB=[],LIBU=null,WSV='docs',WSSEL=null,WSF='All',WSQ='',WSPOLL=null;
+const IC={home:'<path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/>',docs:'<path d="M4 4h6v16H4zM14 4h6v16h-6z"/>',review:'<path d="M12 9v4M12 17h.01M10.3 3.9L2 18a2 2 0 001.7 3h16.6A2 2 0 0022 18L13.7 3.9a2 2 0 00-3.4 0z"/>',run:'<path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',priv:'<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>',file:'<path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5"/>'};
+const svgI=k=>`<svg viewBox="0 0 24 24">${IC[k]}</svg>`;
+const FCOL={PDF:'#f2686b',PNG:'#6ea8fe',JPG:'#3ecf8e',JPEG:'#3ecf8e'};
+const fsize=b=>b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,b/1024|0)+' KB';
+function ago(t){const s=Date.now()/1000-t;if(s<60)return 'just now';if(s<3600)return (s/60|0)+' min ago';if(s<86400)return (s/3600|0)+' h ago';if(s<172800)return 'yesterday';return new Date(t*1000).toLocaleDateString(undefined,{month:'short',day:'numeric',year:new Date(t*1000).getFullYear()==new Date().getFullYear()?undefined:'numeric'})}
+const needsReview=d=>d.status=='failed'||(d.stats&&d.stats.flagged>0);
+function contentOf(d){const s=d.stats;if(!s)return d.status=='failed'?'—':'…';const p=[];if(s.tables)p.push(s.tables+' table'+(s.tables>1?'s':''));if(s.equations)p.push(s.equations+' equation'+(s.equations>1?'s':''));if(s.scanned)p.push('scanned · OCR');if(s.handwriting)p.push('handwriting');if(s.figures&&p.length<2)p.push(s.figures+' figure'+(s.figures>1?'s':''));return p.length?p.slice(0,3).join(' · '):'text'}
+function statusOf(d){if(d.status=='processing')return `<span class="wpill run">${esc(d.progress||'Processing')}</span>`;if(d.status=='failed')return `<span class="wpill er" title="${esc(d.error||'')}">✕ Failed</span>`;
+ const s=d.stats||{},pct=s.blocks?Math.round(100*s.verified/s.blocks):100;return s.flagged?`<span class="wpill ${pct>=90?'ok':'wn'}" title="${s.flagged} block(s) flagged for review">${pct>=90?'✓':'⚠'} ${pct}% verified</span>`:'<span class="wpill ok">✓ 100% verified</span>'}
+const FILTERS={All:()=>1,PDF:d=>d.type=='PDF',Images:d=>d.type!='PDF','With tables':d=>d.stats&&d.stats.tables>0,'With equations':d=>d.stats&&d.stats.equations>0,Scanned:d=>d.stats&&d.stats.scanned>0,'Needs review':needsReview};
+function goWs(view){if(!ME)return show('landing');WSV=view||'docs';show('ws');capBadge();renderWs();loadLib()}
+function wsNav(v,f){WSV=v;if(f)WSF=f;else if(v=='docs'&&f===undefined)WSF='All';renderWs()}
+function loadLib(){if(!ME)return;clearTimeout(WSPOLL);return fetch('/api/my/documents',{credentials:'same-origin'}).then(r=>{if(r.status==401){ME=null;lpAuth();show('landing');throw 0}return r.json()}).then(j=>{LIB=j.documents||[];LIBU=j.usage;if(WSSEL&&!LIB.some(d=>d.id==WSSEL))WSSEL=null;renderWs();
+ if(LIB.some(d=>d.status=='processing')&&$('ws').classList.contains('on'))WSPOLL=setTimeout(loadLib,2000)}).catch(()=>{})}
+function renderWs(){if(!ME)return;const rv=LIB.filter(needsReview).length,run=LIB.filter(d=>d.status=='processing').length,it=(on,ic,label,cnt,act)=>`<button class="ws-it ${on?'on':''}" onclick="${act}">${svgI(ic)}<span class="nm">${label}</span>${cnt!=null?`<em>${cnt}</em>`:''}</button>`;
+ $('wsNav').innerHTML=it(false,'home','Home',null,"show('landing');lpAuth();bnArm()")+it(WSV=='docs'&&WSF!='Needs review','docs','My documents',LIB.length,"wsNav('docs','All')")+it(WSV=='docs'&&WSF=='Needs review','review','Needs review',rv,"wsNav('docs','Needs review')")+(run?it(false,'run','Processing',run,"wsNav('docs','All')"):'');
+ $('wsRecent').innerHTML=LIB.slice(0,5).map(d=>`<button class="ws-it" onclick="openSaved('${d.id}')" title="${esc(d.filename)}">${svgI('file')}<span class="nm">${esc(d.filename)}</span></button>`).join('')||'<div class="mu" style="font-size:12.5px;padding:4px 10px">Nothing yet</div>';
+ $('wsAcct').innerHTML=it(WSV=='settings','set','Settings',null,"wsNav('settings')")+it(WSV=='privacy','priv','Privacy & data',null,"wsNav('privacy')");
+ $('wsStore').innerHTML=LIBU?`<b>${LIBU.documents}</b> document${LIBU.documents==1?'':'s'} · <b>${LIBU.pages}</b> page${LIBU.pages==1?'':'s'}<br>${fsize(LIBU.bytes||0)} stored on this server`:'';
+ $('wsMe').innerHTML=`<div class="av">${esc(initials(ME.name))}</div><div class="who"><div style="font-weight:600;font-size:13.5px">${esc(ME.name)}</div><div class="mu" style="font-size:12px">${esc(ME.email)}</div></div><span class="lp-sp"></span><button class="btn sm" onclick="logout()">Log out</button>`;
+ renderWsBody()}
+function renderWsBody(){const b=$('wsBody');if(!b)return;if(WSV=='settings')return b.innerHTML=settingsHTML();if(WSV=='privacy')return b.innerHTML=privacyHTML();
+ const q=WSQ.trim().toLowerCase(),L=LIB.filter(FILTERS[WSF]||FILTERS.All).filter(d=>!q||d.filename.toLowerCase().includes(q));
+ if(!WSSEL||!L.some(d=>d.id==WSSEL))WSSEL=L[0]?L[0].id:null;const cur=LIB.find(d=>d.id==WSSEL);
+ const drop=`<div class="ws-drop" id="wsdrop" onclick="fi.click()"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div><div><b>Drop files to upload</b><div class="mu" style="font-size:12.5px">PDF · PNG · JPG · JPEG — saved to your library automatically${BE?` · up to ${BE.max_upload_mb} MB`:''}</div></div><span class="lp-sp"></span><button class="btn" onclick="event.stopPropagation();fi.click()">Browse</button></div>`;
+ const rows=L.map(d=>`<tr class="r ${d.id==WSSEL?'sel':''}" onclick="wsSel('${d.id}')" ondblclick="openSaved('${d.id}')"><td class="nm"><div><span class="fic" style="background:${FCOL[d.type]||'#8a919b'}">${esc(d.type||'?')}</span><span title="${esc(d.filename)}">${esc(d.filename)}</span></div></td><td>${d.pages??''}</td><td class="mu hide-s">${esc(contentOf(d))}</td><td>${statusOf(d)}</td><td class="mu hide-s">${ago(d.created)}</td></tr>`).join('');
+ const list=LIB.length?(L.length?`<table class="ws-t"><tr><th>Name</th><th>Pages</th><th class="hide-s">Content</th><th>Status</th><th class="hide-s">Uploaded</th></tr>${rows}</table>`:`<div class="ws-empty">No documents match${q?` “${esc(WSQ)}”`:''} in ${esc(WSF)}.</div>`):`<div class="ws-empty"><b style="color:var(--tx);font-size:15px">Your library is empty</b><p style="margin:6px 0 0">Upload a PDF or image — it is processed, opened in the viewer and kept here so you can come back to it.</p></div>`;
+ b.innerHTML=`<div class="ws-grid"><div><h2 class="ws-h2">${WSF=='Needs review'?'Needs review':'My documents'}</h2><div class="ws-chips">${Object.keys(FILTERS).map(k=>`<button class="${k==WSF?'on':''}" onclick="WSF='${k}';renderWs()">${k}</button>`).join('')}</div>${drop}${list}</div>${cur?panelHTML(cur):'<div></div>'}</div>`}
+function wsSel(id){WSSEL=id;renderWsBody()}
+function panelHTML(d){const s=d.stats||{},pct=s.blocks?Math.round(100*s.verified/s.blocks):null,done=d.status=='complete';
+ return `<div class="ws-panel"><div style="display:flex;align-items:center;gap:8px"><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.filename)}">${esc(d.filename)}</b><span class="lp-sp"></span>${statusOf(d)}</div>
+<div class="mu" style="font-size:12px;margin:2px 0 10px">${d.pages??'?'} page${d.pages==1?'':'s'} · ${fsize(d.size||0)}${s.seconds!=null?` · processed in ${(+s.seconds).toFixed(1)} s`:''} · ${ago(d.created)}</div>
+<div class="ws-thumb">${done?`<img src="/api/thumb/${d.id}/1.jpg" alt="First page of ${esc(d.filename)}" loading="lazy">`:`<span class="mu" style="font-size:12.5px">${d.status=='failed'?esc(d.error||'Processing failed'):'Processing…'}</span>`}</div>
+${done?`<div class="k">Summary</div><div class="ws-st"><div><b>${s.blocks??0}</b><span>blocks</span></div><div><b>${s.tables??0}</b><span>tables</span></div><div><b>${pct??'—'}${pct!=null?'%':''}</b><span>verified</span></div><div><b>${s.furniture??0}</b><span>headers/footers set aside</span></div></div>`:''}
+<div class="ws-acts">${done?`<button class="btn go" onclick="openSaved('${d.id}')">Open in viewer</button><div class="row2"><button class="btn" onclick="dlSaved('${d.id}','md')">⬇ Markdown</button><button class="btn" onclick="dlSaved('${d.id}','json')">⬇ JSON</button></div>`:d.status=='processing'?`<button class="btn go" onclick="openSaved('${d.id}')">Show progress</button>`:''}
+<div class="row2"><button class="btn" onclick="renameSaved('${d.id}')">Rename</button><button class="btn danger" onclick="deleteSaved('${d.id}')" ${d.status=='processing'?'disabled title="Wait until processing finishes"':''}>Delete</button></div></div></div>`}
+function openSaved(id){const d=LIB.find(x=>x.id==id);if(!d)return;if(d.status=='processing')return track({document_id:id,filename:d.filename,type:d.type,pages:d.pages},fsize(d.size||0));
+ if(d.status=='failed')return dlg({title:'Processing failed',text:d.error||'This document could not be processed.',ok:'OK'});
+ fetch('/api/document/'+id,{credentials:'same-origin'}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(doc=>{DOC=doc;DOC.filename=d.filename;open()}).catch(()=>dlg({title:'Could not open the document',text:'The processed result is missing on the server. Delete it and upload the file again.',ok:'OK'}))}
+function dlSaved(id,kind){const d=LIB.find(x=>x.id==id),base=(d?d.filename:'document').replace(/\.[^.]+$/,'');
+ fetch(kind=='md'?`/api/document/${id}/markdown`:`/api/document/${id}`,{credentials:'same-origin'}).then(r=>r.text()).then(t=>dl(base+(kind=='md'?'.md':'.parseflow.json'),t,kind=='md'?'text/markdown':'application/json'))}
+function renameSaved(id){const d=LIB.find(x=>x.id==id);dlg({title:'Rename document',input:d.filename,ok:'Rename'}).then(v=>{if(v===false)return;api('/api/my/documents/'+id,{method:'PATCH',body:JSON.stringify({filename:v})}).then(loadLib).catch(e=>dlg({title:'Could not rename',text:e.message}))})}
+function deleteSaved(id){const d=LIB.find(x=>x.id==id);dlg({title:'Delete this document?',text:`“${d.filename}” and its results will be removed from the server. This cannot be undone.`,ok:'Delete',danger:true}).then(v=>{if(!v)return;api('/api/my/documents/'+id,{method:'DELETE'}).then(()=>{WSSEL=null;loadLib()}).catch(e=>dlg({title:'Could not delete',text:e.message}))})}
+function settingsHTML(){return `<h2 class="ws-h2" style="margin-bottom:16px">Settings</h2>
+<form class="ws-form" onsubmit="event.preventDefault();saveName(this)"><h3>Profile</h3><p>Your name is shown in the sidebar. The email is your login.</p><label class="fld"><span>Name</span><input name="name" value="${esc(ME.name)}" maxlength="80" required></label><label class="fld"><span>Email</span><input value="${esc(ME.email)}" disabled></label><button class="btn go">Save</button><span class="okmsg" id="okName"></span><div class="ermsg" id="erName"></div></form>
+<form class="ws-form" onsubmit="event.preventDefault();savePw(this)"><h3>Password</h3><p>Changing it signs you out on other devices.</p><label class="fld"><span>Current password</span><input name="current" type="password" autocomplete="current-password" required></label><label class="fld"><span>New password (at least 8 characters)</span><input name="new" type="password" autocomplete="new-password" minlength="8" required></label><button class="btn go">Change password</button><span class="okmsg" id="okPw"></span><div class="ermsg" id="erPw"></div></form>
+<div class="ws-form" style="border-color:#f2686b55"><h3>Delete account</h3><p>Removes your account and all ${LIB.length} saved document${LIB.length==1?'':'s'} from this server. This cannot be undone.</p><button class="btn danger" onclick="deleteAccount()">Delete my account…</button></div>`}
+function privacyHTML(){return `<h2 class="ws-h2" style="margin-bottom:16px">Privacy &amp; data</h2><div class="ws-form"><h3>Where your files live</h3><p style="margin-bottom:8px">Uploads and results are stored on this ParseFlow server, in its data folder. Documents you upload while logged in stay in your library until you delete them or your account. Uploads made without an account are deleted automatically after 24 hours.</p>
+<h3 style="margin-top:14px">What leaves the server</h3><p style="margin-bottom:8px">Nothing, unless the server owner has configured a vision model: then only handwriting, chart and diagram regions are sent to that provider for reading. Status: <b>${BE&&BE.vision&&BE.vision.configured?'vision model configured ('+esc(BE.vision.provider)+')':'no vision model configured — everything stays local'}</b>.</p>
+<h3 style="margin-top:14px">Your account</h3><p>Passwords are stored as salted scrypt hashes; sessions use an HttpOnly cookie. Delete a document from its panel, or everything from Settings → Delete account.</p></div>`}
+function saveName(f){api('/api/account',{method:'PATCH',body:JSON.stringify({name:f.name.value})}).then(j=>{ME=j.user;renderWs();lpAuth();$('okName').textContent='Saved'}).catch(e=>$('erName').textContent=e.message)}
+function savePw(f){$('erPw').textContent='';api('/api/account/password',{method:'POST',body:JSON.stringify({current:f.current.value,new:f.new.value})}).then(()=>{f.reset();$('okPw').textContent='Password changed'}).catch(e=>$('erPw').textContent=e.message)}
+function deleteAccount(){dlg({title:'Delete your account?',text:`Enter your password to delete your account and all ${LIB.length} saved document(s). This cannot be undone.`,input:'',password:true,ok:'Delete account',danger:true}).then(pw=>{if(pw===false)return;api('/api/account/delete',{method:'POST',body:JSON.stringify({password:pw})}).then(()=>{ME=null;LIB=[];lpAuth();show('landing')}).catch(e=>dlg({title:'Account not deleted',text:e.message}))})}
+function goHome(){tourEnd();if(ME)goWs();else{show('landing');lpAuth();bnArm()}}
+
+lpInit();</script></body></html>
